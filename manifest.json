@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Remarkable \u2014 Pubky URL Tagger",
+  "name": "Graphiti \u2014 Pubky URL Tagger",
   "version": "1.1.0",
   "description": "Tag, bookmark, and see link posts from your Pubky network. QR-only Ring auth; Nexus + fallback reads.",
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Remarkable"
+    "default_title": "Graphiti"
   },
   "permissions": [
     "storage",
@@ -42,7 +42,7 @@
       "suggested_key": {
         "default": "Alt+P"
       },
-      "description": "Toggle Remarkable sidebar"
+      "description": "Toggle Graphiti sidebar"
     }
   },
   "omnibox": {

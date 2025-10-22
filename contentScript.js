@@ -1,7 +1,7 @@
 const DEFAULTS = {
   RELAY: "https://httprelay.pubky.app/link/",
   NEXUS: "https://nexus.pubky.app",
-  CAPS: ["/pub/remarkable/:rw"],
+  CAPS: ["/pub/graphiti/:rw"],
   SIDEBAR_WIDTH: 380
 };
 
@@ -14,7 +14,7 @@ const sdkReady = (async () => {
   }
 })();
 
-const SIDEBAR_ID = "remarkable-sidebar";
+const SIDEBAR_ID = "graphiti-sidebar";
 const STATE = {
   open: false,
   currentUrl: null,
@@ -51,40 +51,40 @@ function ensureSidebar() {
   shadowRoot.appendChild(styleLink);
 
   const wrapper = document.createElement("div");
-  wrapper.className = "remarkable-shell";
+  wrapper.className = "graphiti-shell";
   wrapper.innerHTML = `
     <style>${getSidebarCss()}</style>
-    <div class="remarkable-panel">
-      <header class="remarkable-header">
-        <strong>Remarkable</strong>
-        <button class="remarkable-close" title="Close">×</button>
+    <div class="graphiti-panel">
+      <header class="graphiti-header">
+        <strong>Graphiti</strong>
+        <button class="graphiti-close" title="Close">×</button>
       </header>
-      <section class="remarkable-form">
+      <section class="graphiti-form">
         <label>Tags
           <input type="text" name="tags" placeholder="comma,separated" />
         </label>
         <label>Note
           <textarea name="note" rows="3" placeholder="Add a note"></textarea>
         </label>
-        <div class="remarkable-actions">
-          <button type="submit" class="remarkable-save">Save</button>
-          <button type="button" class="remarkable-bookmark" title="Toggle bookmark">☆</button>
+        <div class="graphiti-actions">
+          <button type="submit" class="graphiti-save">Save</button>
+          <button type="button" class="graphiti-bookmark" title="Toggle bookmark">☆</button>
         </div>
-        <p class="remarkable-status" aria-live="polite"></p>
+        <p class="graphiti-status" aria-live="polite"></p>
       </section>
-      <section class="remarkable-list" aria-live="polite"></section>
+      <section class="graphiti-list" aria-live="polite"></section>
     </div>`;
   shadowRoot.appendChild(wrapper);
   document.documentElement.appendChild(container);
 
-  form = shadowRoot.querySelector(".remarkable-form");
-  list = shadowRoot.querySelector(".remarkable-list");
-  status = shadowRoot.querySelector(".remarkable-status");
-  bookmarkToggle = shadowRoot.querySelector(".remarkable-bookmark");
+  form = shadowRoot.querySelector(".graphiti-form");
+  list = shadowRoot.querySelector(".graphiti-list");
+  status = shadowRoot.querySelector(".graphiti-status");
+  bookmarkToggle = shadowRoot.querySelector(".graphiti-bookmark");
   noteInput = shadowRoot.querySelector("textarea[name=note]");
   tagsInput = shadowRoot.querySelector("input[name=tags]");
 
-  shadowRoot.querySelector(".remarkable-close").addEventListener("click", () => toggleSidebar(false));
+  shadowRoot.querySelector(".graphiti-close").addEventListener("click", () => toggleSidebar(false));
   bookmarkToggle.addEventListener("click", onBookmarkToggle);
   form.addEventListener("submit", onSave);
 }
@@ -140,7 +140,7 @@ async function refreshData() {
     renderList();
     updateBookmarkUi();
     if (!STATE.posts.length) {
-      list.innerHTML = `<p class="remarkable-empty">No posts yet.</p>`;
+      list.innerHTML = `<p class="graphiti-empty">No posts yet.</p>`;
     }
   } catch (err) {
     setError(err?.message || "Failed to load");
@@ -164,8 +164,8 @@ function setError(msg) {
   STATE.error = msg;
   if (status) {
     status.textContent = msg;
-    status.classList.add("remarkable-error");
-    setTimeout(() => status.classList.remove("remarkable-error"), 2000);
+    status.classList.add("graphiti-error");
+    setTimeout(() => status.classList.remove("graphiti-error"), 2000);
   }
 }
 
@@ -215,7 +215,7 @@ async function toggleSidebar(force) {
 
 async function sendBg(type, payload, urlOverride) {
   const data = await chrome.runtime.sendMessage({
-    scope: "remarkable:bg",
+    scope: "graphiti:bg",
     type,
     payload,
     url: urlOverride || STATE.currentUrl,
@@ -241,8 +241,8 @@ window.addEventListener("keydown", (evt) => {
 
 function getSidebarCss() {
   return `
-    :host, .remarkable-shell { all: initial; }
-    .remarkable-shell {
+    :host, .graphiti-shell { all: initial; }
+    .graphiti-shell {
       position: fixed;
       top: 0;
       right: 0;
@@ -251,7 +251,7 @@ function getSidebarCss() {
       z-index: 2147483647;
       font-family: 'Inter', system-ui, sans-serif;
     }
-    .remarkable-panel {
+    .graphiti-panel {
       background: var(--surface);
       color: var(--text);
       height: 100%;
@@ -260,7 +260,7 @@ function getSidebarCss() {
       border-left: 1px solid var(--border);
       box-shadow: -4px 0 16px rgba(0,0,0,0.45);
     }
-    .remarkable-header {
+    .graphiti-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -268,7 +268,7 @@ function getSidebarCss() {
       background: var(--bg);
       border-bottom: 1px solid var(--border);
     }
-    .remarkable-close {
+    .graphiti-close {
       background: transparent;
       border: none;
       color: var(--muted);
@@ -277,35 +277,35 @@ function getSidebarCss() {
       padding: 0;
       cursor: pointer;
     }
-    .remarkable-form {
+    .graphiti-form {
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
       padding: 1rem;
       border-bottom: 1px solid var(--border);
     }
-    .remarkable-actions {
+    .graphiti-actions {
       display: flex;
       gap: 0.5rem;
     }
-    .remarkable-save {
+    .graphiti-save {
       flex: 1;
     }
-    .remarkable-bookmark {
+    .graphiti-bookmark {
       width: 3rem;
       background: var(--accent-soft);
       color: var(--accent);
       border: 1px solid var(--border);
     }
-    .remarkable-status {
+    .graphiti-status {
       min-height: 1.5rem;
       font-size: 0.8rem;
       color: var(--muted);
     }
-    .remarkable-status.remarkable-error {
+    .graphiti-status.graphiti-error {
       color: var(--danger);
     }
-    .remarkable-list {
+    .graphiti-list {
       flex: 1;
       overflow-y: auto;
       padding: 1rem;
@@ -313,7 +313,7 @@ function getSidebarCss() {
       flex-direction: column;
       gap: 0.75rem;
     }
-    .remarkable-empty {
+    .graphiti-empty {
       color: var(--muted);
       text-align: center;
     }

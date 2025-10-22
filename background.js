@@ -15,7 +15,7 @@ const RECENT_TABS = new Map();
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
-      id: "remarkable-save",
+      id: "graphiti-save",
       title: "Save link post to Pubky",
       contexts: ["page", "link"]
     });
@@ -32,7 +32,7 @@ chrome.commands.onCommand.addListener(async (command) => {
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId !== "remarkable-save") return;
+  if (info.menuItemId !== "graphiti-save") return;
   const targetUrl = info.linkUrl || info.pageUrl;
   if (!targetUrl || !tab?.id) return;
   RECENT_TABS.set(tab.id, targetUrl);
@@ -40,7 +40,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || message.scope !== "remarkable:bg") return;
+  if (!message || message.scope !== "graphiti:bg") return;
   (async () => {
     try {
       switch (message.type) {
@@ -54,7 +54,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
         case "auth:start": {
-          await startRingAuth();
+          await startRingAuth({ awaitApproval: false });
           sendResponse({ ok: true });
           return;
         }
@@ -81,6 +81,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case "bookmark:delete": {
           await deleteBookmark(message.payload);
           sendResponse({ ok: true });
+          return;
+        }
+        case "recent:get": {
+          const tabId = message.payload?.tabId ?? sender?.tab?.id;
+          let value = null;
+          if (typeof tabId === "number") {
+            value = getRecentUrlForTab(tabId);
+            RECENT_TABS.delete(tabId);
+          }
+          sendResponse({ ok: true, value });
           return;
         }
         case "url:normalize": {

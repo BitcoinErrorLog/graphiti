@@ -1,13 +1,13 @@
-# Remarkable — Pubky URL Tagger
+# Graphiti — Pubky URL Tagger
 
-Remarkable is a Chrome Manifest V3 extension that lets you publish deterministic link posts to your Pubky homeserver, browse what your follows have shared about the current page, and keep quick local bookmarks.
+Graphiti is a Chrome Manifest V3 extension that lets you publish deterministic link posts to your Pubky homeserver, browse what your follows have shared about the current page, and keep quick local bookmarks. The extension now lives at the repository root so you can load this folder directly in `chrome://extensions`.
 
 ## Features
 
-- **QR-only Pubky Ring authentication**: Initiate the Ring flow from the Options page and scan the QR code on mobile to sign in.
-- **Deterministic link posts**: Normalize URLs, hash them, and publish `LinkPost` JSON files to your Pubky space with tags and notes.
+- **QR-only Pubky Ring authentication**: Launch the Ring flow from the options page, scan the QR code with the mobile app, and Graphiti will persist the approved session automatically.
+- **Deterministic link posts**: Normalize URLs, hash them, and publish `LinkPost` JSON files to your Pubky storage with tags and notes.
 - **Realtime sidebar feed**: Toggle a Shadow DOM sidebar (Alt+P) that shows your follows’ posts for the active tab via Nexus search with Pubky fallback requests.
-- **Popup quick actions**: Save the current tab as a link post or bookmark, jump to Options, or open the sidebar from the browser action popup.
+- **Popup quick actions**: Save the current tab as a link post or bookmark, open the sidebar, or jump to options directly from the browser action popup.
 - **Local bookmarks**: Store private bookmarks in `chrome.storage.local`, including tags and notes, with sync between popup and sidebar.
 - **Context menu save**: Right-click any page or link and choose “Save link post to Pubky” to prefill the popup for publishing.
 - **Omnibox search shortcut**: Type `pubky` in the Chrome address bar to search Nexus for link posts matching free text.
@@ -15,18 +15,18 @@ Remarkable is a Chrome Manifest V3 extension that lets you publish deterministic
 
 ## Getting started
 
-1. Copy your provided Pubky SDK assets (`lib/index.js` and `lib/pubky_bg.wasm`) into `remarkable/lib/` before loading the extension.
-2. In Chrome, open `chrome://extensions`, enable **Developer mode**, then click **Load unpacked** and select the `remarkable/` folder.
-3. The extension action icon will appear in the toolbar; pin it for quicker access.
+1. (Optional) Copy your provided Pubky SDK assets (`lib/index.js`, `lib/pubky_bg.wasm`, etc.) into a local `lib/` directory at the repository root if you want SDK-powered helpers. Graphiti gracefully degrades when the bundle is absent.
+2. In Chrome, open `chrome://extensions`, enable **Developer mode**, then click **Load unpacked** and select this repository folder.
+3. Pin the Graphiti action icon in the toolbar for quicker access.
 
 ## Usage
 
 ### Authenticate with Pubky Ring
 
-1. Open the extension popup and click **Settings**, or visit **chrome://extensions → Remarkable → Extension options**.
-2. In the Options page, review the relay/Nexus defaults and click **Sign in with Pubky Ring**.
+1. Open the extension popup and click **Settings**, or visit **chrome://extensions → Graphiti → Extension options**.
+2. In the options page, review the relay/Nexus defaults and click **Sign in with Pubky Ring**.
 3. A new tab with `auth.html` opens; scan the QR code using the Pubky Ring mobile app.
-4. Once approved, the Options page will display your Pubky ID and session token status.
+4. Once approved, the options page will display your Pubky ID and session token status.
 
 ### Save link posts
 
@@ -43,7 +43,7 @@ Remarkable is a Chrome Manifest V3 extension that lets you publish deterministic
 
 - Open the sidebar (Alt+P) to automatically fetch posts for the active tab.
 - Entries are sorted by `created_at` and labeled with the author Pubky IDs when provided.
-- If Nexus is unavailable, the extension falls back to fetching directly from each follow.
+- If Nexus is unavailable, Graphiti falls back to fetching directly from each follow.
 
 ### Omnibox shortcut
 
@@ -56,7 +56,6 @@ Remarkable is a Chrome Manifest V3 extension that lets you publish deterministic
 
 ## Development notes
 
-- The extension loads the Pubky SDK dynamically from `remarkable/lib/`. Ensure those assets exist before testing.
+- Graphiti loads the Pubky SDK dynamically from `lib/` when the bundle is present so you can ship the assets alongside the extension.
 - No bundler is required; all scripts are ES modules compatible with MV3 service workers.
-- Source files live in the `remarkable/` directory; update the manifest there if you customize permissions or resources.
-
+- Source files live at the repository root.

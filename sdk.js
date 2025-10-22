@@ -1,16 +1,15 @@
 const DEFAULTS = {
   RELAY: "https://httprelay.pubky.app/link/",
   NEXUS: "https://nexus.pubky.app",
-  CAPS: ["/pub/remarkable/:rw"],
+  CAPS: ["/pub/graphiti/:rw"],
   SIDEBAR_WIDTH: 380
 };
 
-const STORAGE_CONFIG_KEY = "remarkable:config";
-const SESSION_KEY = "remarkable:session";
+const STORAGE_CONFIG_KEY = "graphiti:config";
+const SESSION_KEY = "graphiti:session";
 const BOOKMARK_PREFIX = "bm:";
 const CACHE_TTL = 30_000; // 30s cache for sidebar reads
 
-let clientPromise;
 let searchCache = new Map();
 
 export async function getConfig() {
@@ -29,9 +28,6 @@ export async function setConfig(cfg) {
   const current = await getConfig();
   const next = { ...current, ...cfg };
   await chrome.storage.sync.set({ [STORAGE_CONFIG_KEY]: next });
-  if (typeof cfg.debug === "boolean") {
-    clientPromise = undefined; // reset to reapply log level
-  }
 }
 
 export function normalizeUrl(href) {
@@ -56,7 +52,9 @@ export function normalizeUrl(href) {
   return u.toString();
 }
 
-export async function startRingAuth() {
+const ringWatchers = new Map();
+
+export async function startRingAuth({ awaitApproval = true } = {}) {
   const cfg = await getConfig();
   const caps = DEFAULTS.CAPS;
   const relay = cfg.relay || DEFAULTS.RELAY;
@@ -77,28 +75,15 @@ export async function startRingAuth() {
 
   const statusUrl = `${relayBase}requests/${encodeURIComponent(reqData.id)}`;
   await chrome.tabs.create({ url: chrome.runtime.getURL(`auth.html#auth=${encodeURIComponent(reqData.url)}&status=${encodeURIComponent(statusUrl)}`) });
-
-  const deadline = Date.now() + 180_000;
-  while (Date.now() < deadline) {
-    const statusRes = await fetch(statusUrl);
-    if (!statusRes.ok) {
-      await delay(1000);
-      continue;
-    }
-    const payload = await statusRes.json();
-    if (payload.status === "approved" && payload.session && payload.pubkey) {
-      await Promise.all([
-        setSession(payload.session),
-        setConfig({ myPubkey: payload.pubkey })
-      ]);
-      return true;
-    }
-    if (payload.status === "denied" || payload.status === "expired") {
-      throw new Error("Auth denied or expired.");
-    }
-    await delay(1000);
+  const watcher = watchRingStatus(statusUrl);
+  if (awaitApproval) {
+    await watcher;
+  } else {
+    watcher.catch((err) => {
+      console.error("Ring auth failed", err);
+    });
   }
-  throw new Error("Auth timeout.");
+  return true;
 }
 
 export async function createUrlPost({ url, tags, note }) {
@@ -108,9 +93,8 @@ export async function createUrlPost({ url, tags, note }) {
     throw new Error("Set your pubkey in Settings first.");
   }
   const normalized = normalizeUrl(url);
-  await getClient();
   const fname = await sha256Hex(normalized);
-  const target = `https://_pubky.${cfg.myPubkey}/pub/remarkable/${fname}.json`;
+  const target = `https://_pubky.${cfg.myPubkey}/pub/graphiti/${fname}.json`;
   const post = {
     kind: "link",
     content: normalized,
@@ -204,7 +188,7 @@ async function fallbackReads(normalized, following) {
   const urlHash = await sha256Hex(normalized);
   await Promise.all(following.map(async (z32) => {
     try {
-      const url = `https://_pubky.${z32}/pub/remarkable/${urlHash}.json`;
+      const url = `https://_pubky.${z32}/pub/graphiti/${urlHash}.json`;
       const res = await fetch(url);
       if (!res.ok) return;
       const data = await res.json();
@@ -222,6 +206,45 @@ function invalidateCache(normalized) {
   searchCache.delete(normalized);
 }
 
+function watchRingStatus(statusUrl) {
+  if (ringWatchers.has(statusUrl)) {
+    return ringWatchers.get(statusUrl);
+  }
+  const deadline = Date.now() + 180_000;
+  const watcher = (async () => {
+    try {
+      while (Date.now() < deadline) {
+        try {
+          const statusRes = await fetch(statusUrl);
+          if (!statusRes.ok) {
+            await delay(1000);
+            continue;
+          }
+          const payload = await statusRes.json();
+          if (payload.status === "approved" && payload.session && payload.pubkey) {
+            await Promise.all([
+              setSession(payload.session),
+              setConfig({ myPubkey: payload.pubkey })
+            ]);
+            return;
+          }
+          if (payload.status === "denied" || payload.status === "expired") {
+            throw new Error("Auth denied or expired.");
+          }
+        } catch (err) {
+          console.warn("Ring status poll failed", err);
+        }
+        await delay(1000);
+      }
+      throw new Error("Auth timeout.");
+    } finally {
+      ringWatchers.delete(statusUrl);
+    }
+  })();
+  ringWatchers.set(statusUrl, watcher);
+  return watcher;
+}
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -233,33 +256,10 @@ export async function sha256Hex(str) {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function getClient() {
-  if (!clientPromise) {
-    clientPromise = (async () => {
-      try {
-        const mod = await import(chrome.runtime.getURL("lib/index.js"));
-        const cfg = await getConfig();
-        if (cfg.debug && typeof mod.setLogLevel === "function") {
-          mod.setLogLevel("debug");
-        }
-        return mod;
-      } catch (err) {
-        console.error("SDK unavailable", err);
-        throw new Error("SDK unavailable");
-      }
-    })();
-  }
-  return clientPromise;
-}
-
-export async function ensureClient() {
-  return getClient();
-}
-
-if (!globalThis.__remarkableSdkListener) {
-  globalThis.__remarkableSdkListener = true;
+if (!globalThis.__graphitiSdkListener) {
+  globalThis.__graphitiSdkListener = true;
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || message.scope !== "remarkable:sdk") return;
+    if (!message || message.scope !== "graphiti:sdk") return;
     (async () => {
       try {
         switch (message.type) {
@@ -290,6 +290,6 @@ if (!globalThis.__remarkableSdkListener) {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "sync" && changes[STORAGE_CONFIG_KEY]) {
-    clientPromise = undefined;
+    searchCache.clear();
   }
 });
