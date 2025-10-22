@@ -11,7 +11,25 @@ let currentUrl = null;
 
 async function init() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  currentUrl = tab?.url ? normalizeUrl(tab.url) : null;
+  const tabUrl = tab?.url ? normalizeUrl(tab.url) : null;
+  let recentUrl = null;
+  if (tab?.id) {
+    try {
+      recentUrl = await sendBg("recent:get", { tabId: tab.id });
+    } catch (err) {
+      console.warn("Failed to fetch recent URL for tab", err);
+    }
+  }
+  if (recentUrl) {
+    try {
+      currentUrl = normalizeUrl(recentUrl);
+    } catch (err) {
+      console.warn("Failed to normalize recent URL", err);
+      currentUrl = tabUrl;
+    }
+  } else {
+    currentUrl = tabUrl;
+  }
   if (!currentUrl) {
     setStatus("Unable to detect URL", true);
   } else {
