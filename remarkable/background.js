@@ -54,7 +54,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
         case "auth:start": {
-          await startRingAuth();
+          await startRingAuth({ awaitApproval: false });
           sendResponse({ ok: true });
           return;
         }

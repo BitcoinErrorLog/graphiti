@@ -1,4 +1,4 @@
-import { normalizeUrl } from "./sdk.js";
+import { normalizeUrl, startRingAuth } from "./sdk.js";
 
 const form = document.getElementById("quick-form");
 const toggleBtn = document.getElementById("toggle");
@@ -94,7 +94,8 @@ settingsBtn.addEventListener("click", () => {
 
 signinBtn.addEventListener("click", async () => {
   try {
-    await sendBg("auth:start");
+    setStatus("Opening Pubky Ring…");
+    await startRingAuth({ awaitApproval: false });
     setStatus("Check the new tab for QR");
   } catch (err) {
     setStatus(err?.message || "Auth failed", true);

@@ -56,7 +56,9 @@ export function normalizeUrl(href) {
   return u.toString();
 }
 
-export async function startRingAuth() {
+const ringWatchers = new Map();
+
+export async function startRingAuth({ awaitApproval = true } = {}) {
   const cfg = await getConfig();
   const caps = DEFAULTS.CAPS;
   const relay = cfg.relay || DEFAULTS.RELAY;
@@ -77,28 +79,15 @@ export async function startRingAuth() {
 
   const statusUrl = `${relayBase}requests/${encodeURIComponent(reqData.id)}`;
   await chrome.tabs.create({ url: chrome.runtime.getURL(`auth.html#auth=${encodeURIComponent(reqData.url)}&status=${encodeURIComponent(statusUrl)}`) });
-
-  const deadline = Date.now() + 180_000;
-  while (Date.now() < deadline) {
-    const statusRes = await fetch(statusUrl);
-    if (!statusRes.ok) {
-      await delay(1000);
-      continue;
-    }
-    const payload = await statusRes.json();
-    if (payload.status === "approved" && payload.session && payload.pubkey) {
-      await Promise.all([
-        setSession(payload.session),
-        setConfig({ myPubkey: payload.pubkey })
-      ]);
-      return true;
-    }
-    if (payload.status === "denied" || payload.status === "expired") {
-      throw new Error("Auth denied or expired.");
-    }
-    await delay(1000);
+  const watcher = watchRingStatus(statusUrl);
+  if (awaitApproval) {
+    await watcher;
+  } else {
+    watcher.catch((err) => {
+      console.error("Ring auth failed", err);
+    });
   }
-  throw new Error("Auth timeout.");
+  return true;
 }
 
 export async function createUrlPost({ url, tags, note }) {
@@ -220,6 +209,45 @@ async function fallbackReads(normalized, following) {
 
 function invalidateCache(normalized) {
   searchCache.delete(normalized);
+}
+
+function watchRingStatus(statusUrl) {
+  if (ringWatchers.has(statusUrl)) {
+    return ringWatchers.get(statusUrl);
+  }
+  const deadline = Date.now() + 180_000;
+  const watcher = (async () => {
+    try {
+      while (Date.now() < deadline) {
+        try {
+          const statusRes = await fetch(statusUrl);
+          if (!statusRes.ok) {
+            await delay(1000);
+            continue;
+          }
+          const payload = await statusRes.json();
+          if (payload.status === "approved" && payload.session && payload.pubkey) {
+            await Promise.all([
+              setSession(payload.session),
+              setConfig({ myPubkey: payload.pubkey })
+            ]);
+            return;
+          }
+          if (payload.status === "denied" || payload.status === "expired") {
+            throw new Error("Auth denied or expired.");
+          }
+        } catch (err) {
+          console.warn("Ring status poll failed", err);
+        }
+        await delay(1000);
+      }
+      throw new Error("Auth timeout.");
+    } finally {
+      ringWatchers.delete(statusUrl);
+    }
+  })();
+  ringWatchers.set(statusUrl, watcher);
+  return watcher;
 }
 
 function delay(ms) {
