@@ -1,61 +1,48 @@
-# Graphiti — Pubky URL Tagger
+# Graphiti Chrome Extension
 
-Graphiti is a Chrome Manifest V3 extension that lets you publish deterministic link posts to your Pubky homeserver, browse what your follows have shared about the current page, and keep quick local bookmarks. The extension now lives at the repository root so you can load this folder directly in `chrome://extensions`.
+Graphiti is a Manifest V3 extension for publishing deterministic link posts to your Pubky storage and browsing what your network has already shared about the page you are viewing. The extension now lives at the repository root so you can load this directory directly in `chrome://extensions` without any build tooling.
 
-## Features
+## Highlights
+- **Pubky Ring authentication** – Launch the Ring flow from the options page or popup, scan the QR code, and Graphiti will persist the approved session and your pubkey automatically.
+- **Deterministic link posts** – Normalize URLs, hash them, and store the resulting JSON into `/pub/graphiti/<hash>.json` on your homeserver.
+- **Sidebar feed** – Toggle an overlay (Alt+P) to review your follows' posts for the active page with Nexus lookups and direct Pubky fallbacks.
+- **Popup quick actions** – Save link posts, flip bookmarks, jump to options, or open the sidebar from the browser action popup. Context-menu saves respect the right-clicked link.
+- **Local bookmarks** – Keep private notes and tags for any URL in `chrome.storage.local`; the popup and sidebar stay in sync.
+- **Omnibox search** – Type `pubky` in the address bar to search Nexus for matching link posts.
 
-- **QR-only Pubky Ring authentication**: Launch the Ring flow from the options page, scan the QR code with the mobile app, and Graphiti will persist the approved session automatically.
-- **Deterministic link posts**: Normalize URLs, hash them, and publish `LinkPost` JSON files to your Pubky storage with tags and notes.
-- **Realtime sidebar feed**: Toggle a Shadow DOM sidebar (Alt+P) that shows your follows’ posts for the active tab via Nexus search with Pubky fallback requests.
-- **Popup quick actions**: Save the current tab as a link post or bookmark, open the sidebar, or jump to options directly from the browser action popup.
-- **Local bookmarks**: Store private bookmarks in `chrome.storage.local`, including tags and notes, with sync between popup and sidebar.
-- **Context menu save**: Right-click any page or link and choose “Save link post to Pubky” to prefill the popup for publishing.
-- **Omnibox search shortcut**: Type `pubky` in the Chrome address bar to search Nexus for link posts matching free text.
-- **Viewer utility**: Open `viewer.html#<payload>` to inspect structured JSON payloads for debugging.
+## Repository layout
+- `manifest.json` – Chrome MV3 manifest pointing to the service worker, popup, options page, and content script.
+- `background.js` – Service worker that wires messaging, context-menu saves, Pubky Ring auth, and omnibox routing.
+- `contentScript.js` – Sidebar UI injected into pages with save/bookmark actions and realtime feed rendering.
+- `popup.html` / `popup.js` – Browser action UI for quick saves, bookmarks, sidebar toggle, and Ring auth.
+- `options.html` / `options.js` – Settings page for homeserver configuration, follow lists, and Ring sign-in.
+- `sdk.js` – Shared helpers for config storage, Pubky writes, bookmark management, search caching, and Ring polling.
+- `auth.html` – Minimal page that renders the QR code and status while waiting for Ring approval.
+- `styles/` – Shared Tailwind-derived base styles for popup/options/sidebar surfaces.
 
-## Getting started
+## Loading the extension
+1. (Optional) If you were provided Pubky SDK binaries (`lib/index.js`, `lib/pubky_bg.wasm`, etc.), copy them into a `lib/` directory at the repository root. Graphiti operates with its built-in fetch helpers, but the folder is listed in `web_accessible_resources` so bundled SDK assets can be shipped with the extension.
+2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select this folder.
+3. Pin the Graphiti icon for easier access.
 
-1. (Optional) Copy your provided Pubky SDK assets (`lib/index.js`, `lib/pubky_bg.wasm`, etc.) into a local `lib/` directory at the repository root if you want SDK-powered helpers. Graphiti gracefully degrades when the bundle is absent.
-2. In Chrome, open `chrome://extensions`, enable **Developer mode**, then click **Load unpacked** and select this repository folder.
-3. Pin the Graphiti action icon in the toolbar for quicker access.
+## Using Graphiti
+### Sign in with Pubky Ring
+1. Open the popup and press **Sign in** (or use **Sign in with Pubky Ring** on the options page).
+2. A new tab (`auth.html`) opens showing a QR code generated from the relay request.
+3. Scan the code with the Pubky Ring mobile app and approve the request. When the relay reports approval, your session token and pubkey are stored and displayed in the options page.
 
-## Usage
+### Save link posts and bookmarks
+- **Popup** – Fill optional tags/notes and press **Save** to publish. Toggle the star button to store/remove a local bookmark.
+- **Context menu** – Right-click any link or page and choose **Save link post to Pubky**; the popup will prefill with the clicked URL.
+- **Sidebar** – Press `Alt+P` to open the overlay, then submit the form to publish and refresh the feed. Bookmarks and posts stay in sync with the popup.
 
-### Authenticate with Pubky Ring
-
-1. Open the extension popup and click **Settings**, or visit **chrome://extensions → Graphiti → Extension options**.
-2. In the options page, review the relay/Nexus defaults and click **Sign in with Pubky Ring**.
-3. A new tab with `auth.html` opens; scan the QR code using the Pubky Ring mobile app.
-4. Once approved, the options page will display your Pubky ID and session token status.
-
-### Save link posts
-
-- Use the popup: add tags (comma-separated) and a note, then click **Save link post** to publish to your Pubky storage.
-- Use the sidebar: press **Alt+P** to open, then submit the form to publish and refresh the feed.
-- Use the context menu: right-click a page or link and choose **Save link post to Pubky**, then finish the details in the popup.
-
-### Manage bookmarks
-
-- Toggle the **Bookmark** button in the sidebar or popup to save/remove a local bookmark for the current URL.
-- Bookmarks are stored locally (`chrome.storage.local`) and can include tags and notes independent of published posts.
-
-### Review follows’ posts
-
-- Open the sidebar (Alt+P) to automatically fetch posts for the active tab.
-- Entries are sorted by `created_at` and labeled with the author Pubky IDs when provided.
-- If Nexus is unavailable, Graphiti falls back to fetching directly from each follow.
+### Browse posts
+The sidebar fetches Nexus search results for the current URL and falls back to direct Pubky reads from your follow list. Results are cached briefly (`sdk.js`) and sorted by `created_at`.
 
 ### Omnibox shortcut
-
-- Type `pubky` followed by a space in the Chrome address bar, enter your query, and press Enter.
-- Results open in the current tab; use **Shift+Enter** or **Alt+Enter** to open in a new tab or window per Chrome defaults.
-
-### Viewer
-
-- Navigate to `chrome-extension://<extension-id>/viewer.html#<encoded-json>` to inspect payloads (e.g., posts or bookmarks) for troubleshooting.
+Type `pubky` followed by a space in Chrome's address bar, enter a query, and submit. Results open in the active tab by default.
 
 ## Development notes
-
-- Graphiti loads the Pubky SDK dynamically from `lib/` when the bundle is present so you can ship the assets alongside the extension.
-- No bundler is required; all scripts are ES modules compatible with MV3 service workers.
-- Source files live at the repository root.
+- All scripts are ES modules and run without a bundler; edits take effect immediately after reloading the extension in Chrome.
+- Messaging namespaces follow the `graphiti:*` prefix. Background handlers clear cached sidebar data when sync storage changes.
+- The repository intentionally omits third-party build steps so it can be loaded directly after cloning.
