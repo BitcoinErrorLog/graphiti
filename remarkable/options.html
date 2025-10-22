@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Remarkable Settings</title>
+    <link rel="stylesheet" href="styles/shadcn.css" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="options">
+      <h1>Remarkable Settings</h1>
+      <form id="settings">
+        <label>My Pubkey
+          <input name="myPubkey" placeholder="z32" />
+        </label>
+        <label>Nexus URL
+          <input name="nexusUrl" placeholder="https://" />
+        </label>
+        <label>Relay URL
+          <input name="relay" placeholder="https://" />
+        </label>
+        <label>Following (comma-separated z32)
+          <input name="following" placeholder="z32,z32" />
+        </label>
+        <label><input type="checkbox" name="debug" /> Enable debug logs</label>
+        <div class="actions">
+          <button type="submit">Save</button>
+          <button type="button" id="signin">Sign in with Pubky Ring</button>
+        </div>
+      </form>
+      <section class="status">
+        <h2>Status</h2>
+        <p id="session">Not signed in</p>
+      </section>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

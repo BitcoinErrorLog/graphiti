@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "Remarkable \u2014 Pubky URL Tagger",
+  "version": "1.1.0",
+  "description": "Tag, bookmark, and see link posts from your Pubky network. QR-only Ring auth; Nexus + fallback reads.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Remarkable"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "contentScript.js"
+      ],
+      "css": [
+        "sidebar.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "commands": {
+    "toggle_sidebar": {
+      "suggested_key": {
+        "default": "Alt+P"
+      },
+      "description": "Toggle Remarkable sidebar"
+    }
+  },
+  "omnibox": {
+    "keyword": "pubky"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "viewer.html",
+        "viewer.js",
+        "auth.html",
+        "styles/shadcn.css",
+        "lib/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

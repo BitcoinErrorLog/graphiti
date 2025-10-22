@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Remarkable Viewer</title>
+    <link rel="stylesheet" href="styles/shadcn.css" />
+    <style>
+      body {
+        padding: 2rem;
+      }
+      pre {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 1rem;
+        border-radius: 8px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Payload Viewer</h1>
+      <pre id="payload">(no data)</pre>
+    </main>
+    <script type="module" src="viewer.js"></script>
+  </body>
+</html>

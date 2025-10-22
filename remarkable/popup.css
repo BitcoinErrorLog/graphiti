@@ -1,0 +1,47 @@
+body {
+  width: 320px;
+  padding: 1rem;
+}
+
+.popup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.actions button:first-child {
+  flex: 1;
+}
+
+.nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nav button {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+#bookmark {
+  width: 3rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+
+#status {
+  min-height: 1.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+#status.error {
+  color: var(--danger);
+}

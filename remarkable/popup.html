@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Remarkable</title>
+    <link rel="stylesheet" href="styles/shadcn.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <h1>Remarkable</h1>
+      <form id="quick-form">
+        <label>Tags
+          <input name="tags" placeholder="comma,separated" />
+        </label>
+        <label>Note
+          <textarea name="note" rows="3" placeholder="Add a note"></textarea>
+        </label>
+        <div class="actions">
+          <button type="submit">Save</button>
+          <button type="button" id="bookmark">☆</button>
+        </div>
+      </form>
+      <nav class="nav">
+        <button type="button" id="toggle">Toggle sidebar</button>
+        <button type="button" id="settings">Settings</button>
+        <button type="button" id="signin">Sign in</button>
+      </nav>
+      <p id="status"></p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
