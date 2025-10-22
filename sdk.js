@@ -52,9 +52,34 @@ export function normalizeUrl(href) {
   return u.toString();
 }
 
+const IS_SERVICE_WORKER =
+  typeof ServiceWorkerGlobalScope !== "undefined" &&
+  globalThis instanceof ServiceWorkerGlobalScope;
+
 const ringWatchers = new Map();
 
-export async function startRingAuth({ awaitApproval = true } = {}) {
+export async function startRingAuth(options = {}) {
+  const opts = {
+    awaitApproval: options.awaitApproval !== false,
+    ...options
+  };
+
+  if (!IS_SERVICE_WORKER) {
+    const response = await chrome.runtime.sendMessage({
+      scope: "graphiti:bg",
+      type: "auth:start",
+      payload: { awaitApproval: opts.awaitApproval }
+    });
+    if (!response?.ok) {
+      throw new Error(response?.error || "Auth failed");
+    }
+    return true;
+  }
+
+  return startRingAuthInWorker(opts);
+}
+
+async function startRingAuthInWorker({ awaitApproval }) {
   const cfg = await getConfig();
   const caps = DEFAULTS.CAPS;
   const relay = cfg.relay || DEFAULTS.RELAY;
@@ -74,7 +99,11 @@ export async function startRingAuth({ awaitApproval = true } = {}) {
   }
 
   const statusUrl = `${relayBase}requests/${encodeURIComponent(reqData.id)}`;
-  await chrome.tabs.create({ url: chrome.runtime.getURL(`auth.html#auth=${encodeURIComponent(reqData.url)}&status=${encodeURIComponent(statusUrl)}`) });
+  await chrome.tabs.create({
+    url: chrome.runtime.getURL(
+      `auth.html#auth=${encodeURIComponent(reqData.url)}&status=${encodeURIComponent(statusUrl)}`
+    )
+  });
   const watcher = watchRingStatus(statusUrl);
   if (awaitApproval) {
     await watcher;
