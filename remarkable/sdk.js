@@ -60,7 +60,9 @@ export async function startRingAuth() {
   const cfg = await getConfig();
   const caps = DEFAULTS.CAPS;
   const relay = cfg.relay || DEFAULTS.RELAY;
-  const reqRes = await fetch(new URL("requests", relay).toString(), {
+  const relayBase = relay.replace(/\/?$/, "/");
+  const requestsEndpoint = `${relayBase}requests`;
+  const reqRes = await fetch(requestsEndpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ caps })
@@ -73,7 +75,7 @@ export async function startRingAuth() {
     throw new Error("Auth relay error creating request");
   }
 
-  const statusUrl = new URL(`requests/${reqData.id}`, relay).toString();
+  const statusUrl = `${relayBase}requests/${encodeURIComponent(reqData.id)}`;
   await chrome.tabs.create({ url: chrome.runtime.getURL(`auth.html#auth=${encodeURIComponent(reqData.url)}&status=${encodeURIComponent(statusUrl)}`) });
 
   const deadline = Date.now() + 180_000;
