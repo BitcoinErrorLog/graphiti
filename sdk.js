@@ -68,7 +68,7 @@ export async function startRingAuth(options = {}) {
     const response = await chrome.runtime.sendMessage({
       scope: "graphiti:bg",
       type: "auth:start",
-      payload: { awaitApproval: opts.awaitApproval }
+      payload: opts
     });
     if (!response?.ok) {
       throw new Error(response?.error || "Auth failed");
