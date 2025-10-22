@@ -83,6 +83,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ ok: true });
           return;
         }
+        case "recent:get": {
+          const tabId = message.payload?.tabId ?? sender?.tab?.id;
+          let value = null;
+          if (typeof tabId === "number") {
+            value = getRecentUrlForTab(tabId);
+            RECENT_TABS.delete(tabId);
+          }
+          sendResponse({ ok: true, value });
+          return;
+        }
         case "url:normalize": {
           sendResponse({ ok: true, value: normalizeUrl(message.href) });
           return;

@@ -108,7 +108,7 @@ export async function createUrlPost({ url, tags, note }) {
     throw new Error("Set your pubkey in Settings first.");
   }
   const normalized = normalizeUrl(url);
-  await getClient();
+  await ensureClient();
   const fname = await sha256Hex(normalized);
   const target = `https://_pubky.${cfg.myPubkey}/pub/remarkable/${fname}.json`;
   const post = {
@@ -245,6 +245,7 @@ async function getClient() {
         return mod;
       } catch (err) {
         console.error("SDK unavailable", err);
+        clientPromise = undefined;
         throw new Error("SDK unavailable");
       }
     })();
@@ -253,7 +254,15 @@ async function getClient() {
 }
 
 export async function ensureClient() {
-  return getClient();
+  try {
+    return await getClient();
+  } catch (err) {
+    if (err?.message === "SDK unavailable") {
+      console.warn("Remarkable SDK unavailable; continuing without optional module.");
+      return null;
+    }
+    throw err;
+  }
 }
 
 if (!globalThis.__remarkableSdkListener) {
