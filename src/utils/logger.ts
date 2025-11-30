@@ -1,7 +1,17 @@
 /**
- * Comprehensive logging utility for debugging the extension
+ * @fileoverview Comprehensive logging utility for debugging the extension.
+ * 
+ * Provides a Logger singleton that:
+ * - Logs to console with color-coded levels
+ * - Persists logs to Chrome storage
+ * - Supports log export and clearing
+ * 
+ * @module utils/logger
  */
 
+/**
+ * Log severity levels.
+ */
 export enum LogLevel {
   DEBUG = 'DEBUG',
   INFO = 'INFO',

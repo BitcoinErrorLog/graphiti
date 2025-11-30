@@ -1,9 +1,19 @@
 /**
- * Tag colors matching Pubky-app/franky
- * Source: https://github.com/pubky/franky/blob/master/src/libs/utils/utils.ts (line 99)
- * Updated to use darker, more saturated colors as seen in Pubky App
+ * @fileoverview Tag color utilities for consistent tag styling.
+ * 
+ * Provides deterministic color assignment for tags, matching
+ * the Pubky-app/franky color system.
+ * 
+ * @module utils/tag-colors
+ * @see https://github.com/pubky/franky/blob/master/src/libs/utils/utils.ts
  */
 
+/**
+ * Color palette for tags.
+ * 
+ * Uses darker, more saturated colors for better readability
+ * with white text.
+ */
 const TAG_COLORS = [
   '#DC2626', // Dark Red
   '#059669', // Dark Teal/Emerald
@@ -18,8 +28,17 @@ const TAG_COLORS = [
 ];
 
 /**
- * Get a consistent color for a tag based on its label
- * Matches the Pubky-app tag color system
+ * Gets a consistent color for a tag based on its label.
+ * 
+ * Uses a hash function to deterministically assign colors,
+ * ensuring the same tag always gets the same color.
+ * 
+ * @param {string} tag - Tag label to get color for
+ * @returns {string} Hex color code (e.g., "#DC2626")
+ * 
+ * @example
+ * const color = getTagColor('javascript');
+ * // Always returns the same color for 'javascript'
  */
 export function getTagColor(tag: string): string {
   let hash = 0;
@@ -33,7 +52,17 @@ export function getTagColor(tag: string): string {
 }
 
 /**
- * Get tag style for inline use
+ * Gets a complete style object for a tag.
+ * 
+ * Returns both background color and text color for
+ * direct use in React style props.
+ * 
+ * @param {string} tag - Tag label to get style for
+ * @returns {{ backgroundColor: string, color: string }} Style object
+ * 
+ * @example
+ * const style = getTagStyle('react');
+ * return <span style={style}>{tag}</span>;
  */
 export function getTagStyle(tag: string): { backgroundColor: string; color: string } {
   const bgColor = getTagColor(tag);

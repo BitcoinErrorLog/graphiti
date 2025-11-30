@@ -1,66 +1,155 @@
+/**
+ * @fileoverview Chrome storage wrapper for managing extension state.
+ * 
+ * This module provides a singleton Storage class that handles:
+ * - Session management (authentication state)
+ * - Bookmark operations
+ * - Tag operations
+ * - Profile caching
+ * - Drawing storage
+ * - Settings persistence
+ * 
+ * All data is stored in `chrome.storage.local` for persistence
+ * across browser sessions.
+ * 
+ * @module utils/storage
+ */
+
 import { logger } from './logger';
 
 /**
- * Storage utility for managing extension state
+ * User session data from Pubky authentication.
  */
-
 export interface Session {
+  /** User's Pubky ID (public key) */
   pubky: string;
+  /** Homeserver URL */
   homeserver: string;
+  /** Unique session identifier */
   sessionId: string;
+  /** Granted capabilities (e.g., ["read", "write"]) */
   capabilities: string[];
+  /** Session creation timestamp (ms since epoch) */
   timestamp: number;
 }
 
+/**
+ * Stored bookmark data.
+ * 
+ * Bookmarks reference Pubky posts, not HTTP URLs directly.
+ * The postUri field contains the actual bookmarked content.
+ */
 export interface StoredBookmark {
+  /** Original HTTP URL that was bookmarked */
   url: string;
+  /** Page title at bookmark time */
   title: string;
+  /** Bookmark creation timestamp (ms since epoch) */
   timestamp: number;
-  pubkyUrl?: string; // Bookmark URL on homeserver
-  bookmarkId?: string; // Bookmark ID for deletion
-  postUri?: string; // The post URI that the bookmark points to
+  /** Full path to bookmark on homeserver */
+  pubkyUrl?: string;
+  /** Bookmark ID for deletion */
+  bookmarkId?: string;
+  /** Post URI that the bookmark points to (the actual social content) */
+  postUri?: string;
 }
 
+/**
+ * Stored tag data.
+ * 
+ * Tags are normalized to lowercase and trimmed.
+ */
 export interface StoredTag {
+  /** URL that the tag is associated with */
   url: string;
+  /** Tag label (normalized to lowercase) */
   label: string;
+  /** Tag creation timestamp (ms since epoch) */
   timestamp: number;
+  /** Full path to tag on homeserver */
   pubkyUrl?: string;
 }
 
-// Pubky App standard profile.json structure
-// This matches the official Pubky App data model
+/**
+ * Pubky App standard profile.json structure.
+ * 
+ * This matches the official Pubky App data model for interoperability.
+ * @see https://github.com/pubky/pubky-app
+ */
 export interface ProfileData {
+  /** Display name */
   name: string;
+  /** User biography */
   bio?: string;
-  image?: string; // Avatar URL
-  status?: string; // Combined status text and emoji
+  /** Avatar image URL */
+  image?: string;
+  /** Status text (may include emoji) */
+  status?: string;
+  /** Social links */
   links?: Array<{
+    /** Link display title */
     title: string;
+    /** Link URL */
     url: string;
   }>;
 }
 
+/**
+ * Cached profile data with TTL.
+ */
 export interface CachedProfile {
+  /** Profile data */
   data: ProfileData;
+  /** Cache creation timestamp (ms since epoch) */
   cachedAt: number;
-  ttl: number; // Time to live in milliseconds
+  /** Time to live in milliseconds */
+  ttl: number;
 }
 
+/**
+ * Drawing data for graffiti feature.
+ */
 export interface Drawing {
+  /** Unique drawing identifier */
   id: string;
+  /** Page URL where drawing was created */
   url: string;
-  canvasData: string; // base64 PNG
+  /** Canvas data as base64-encoded PNG */
+  canvasData: string;
+  /** Drawing creation timestamp (ms since epoch) */
   timestamp: number;
+  /** Author's Pubky ID */
   author: string;
-  pubkyUrl?: string; // URL on homeserver
+  /** Full path to drawing on homeserver (after sync) */
+  pubkyUrl?: string;
 }
 
+/**
+ * Storage singleton for managing extension data.
+ * 
+ * Provides methods for CRUD operations on sessions, bookmarks,
+ * tags, profiles, drawings, and settings.
+ * 
+ * @example
+ * import { storage } from './storage';
+ * 
+ * // Session management
+ * await storage.saveSession(session);
+ * const session = await storage.getSession();
+ * 
+ * // Bookmarks
+ * await storage.saveBookmark(bookmark);
+ * const isBookmarked = await storage.isBookmarked(url);
+ */
 class Storage {
   private static instance: Storage;
 
   private constructor() {}
 
+  /**
+   * Gets the singleton Storage instance.
+   * @returns {Storage} Storage singleton
+   */
   static getInstance(): Storage {
     if (!Storage.instance) {
       Storage.instance = new Storage();
