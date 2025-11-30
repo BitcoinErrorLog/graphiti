@@ -396,42 +396,24 @@ chrome.commands.onCommand.addListener((command) => {
   
   if (command === 'toggle-sidepanel') {
     console.log('[Graphiti] toggle-sidepanel command triggered');
-    // Open the side panel - Chrome doesn't provide a way to check if it's open
-    // The user can close it manually; this shortcut always opens it
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs[0];
-      console.log('[Graphiti] Active tab:', tab?.id, tab?.url);
-      
-      if (!tab?.id) {
-        console.warn('[Graphiti] No active tab found');
-        logger.warn('Background', 'No active tab found for side panel toggle');
+    // Open the side panel - must call open() immediately to preserve user gesture
+    // Using windowId instead of tabId since it's available synchronously
+    chrome.windows.getCurrent((window) => {
+      if (!window?.id) {
+        console.warn('[Graphiti] No current window found');
+        logger.warn('Background', 'No current window found for side panel toggle');
         return;
       }
 
-      const tabId = tab.id;
-
-      // Ensure side panel is enabled and open it
-      chrome.sidePanel.setOptions({
-        tabId,
-        enabled: true,
-        path: 'sidepanel.html'
-      }, () => {
+      console.log('[Graphiti] Opening side panel for window:', window.id);
+      chrome.sidePanel.open({ windowId: window.id }, () => {
         if (chrome.runtime.lastError) {
-          console.error('[Graphiti] Failed to set options:', chrome.runtime.lastError.message);
-          logger.error('Background', 'Failed to set side panel options', new Error(chrome.runtime.lastError.message));
-          return;
+          console.error('[Graphiti] Failed to open:', chrome.runtime.lastError.message);
+          logger.error('Background', 'Failed to open side panel', new Error(chrome.runtime.lastError.message));
+        } else {
+          console.log('[Graphiti] Side panel opened successfully');
+          logger.info('Background', 'Side panel opened via keyboard shortcut', { windowId: window.id });
         }
-        
-        console.log('[Graphiti] Side panel options set, now opening...');
-        chrome.sidePanel.open({ tabId }, () => {
-          if (chrome.runtime.lastError) {
-            console.error('[Graphiti] Failed to open:', chrome.runtime.lastError.message);
-            logger.error('Background', 'Failed to open side panel', new Error(chrome.runtime.lastError.message));
-          } else {
-            console.log('[Graphiti] Side panel opened successfully');
-            logger.info('Background', 'Side panel opened via keyboard shortcut', { tabId });
-          }
-        });
       });
     });
   }
@@ -439,51 +421,34 @@ chrome.commands.onCommand.addListener((command) => {
   if (command === 'open-annotations') {
     console.log('[Graphiti] open-annotations command triggered');
     // Open side panel and switch to annotations tab
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs[0];
-      console.log('[Graphiti] Active tab:', tab?.id, tab?.url);
-      
-      if (!tab?.id) {
-        console.warn('[Graphiti] No active tab found');
-        logger.warn('Background', 'No active tab found for annotations');
+    // Must call open() immediately to preserve user gesture
+    chrome.windows.getCurrent((window) => {
+      if (!window?.id) {
+        console.warn('[Graphiti] No current window found');
+        logger.warn('Background', 'No current window found for annotations');
         return;
       }
 
-      const tabId = tab.id;
-
-      // Ensure side panel is enabled and open
-      chrome.sidePanel.setOptions({
-        tabId,
-        enabled: true,
-        path: 'sidepanel.html'
-      }, () => {
+      console.log('[Graphiti] Opening side panel for annotations, window:', window.id);
+      chrome.sidePanel.open({ windowId: window.id }, () => {
         if (chrome.runtime.lastError) {
-          console.error('[Graphiti] Failed to set options:', chrome.runtime.lastError.message);
-          logger.error('Background', 'Failed to set side panel options', new Error(chrome.runtime.lastError.message));
-          return;
-        }
-
-        console.log('[Graphiti] Side panel options set, now opening for annotations...');
-        chrome.sidePanel.open({ tabId }, () => {
-          if (chrome.runtime.lastError) {
-            console.error('[Graphiti] Failed to open:', chrome.runtime.lastError.message);
-            logger.error('Background', 'Failed to open annotations', new Error(chrome.runtime.lastError.message));
-          } else {
-            console.log('[Graphiti] Side panel opened, switching to annotations tab...');
-            // Send message to sidebar to switch to annotations tab
-            setTimeout(() => {
-              chrome.runtime.sendMessage({
-                type: 'SWITCH_TO_ANNOTATIONS',
-              }).catch(() => {
-                // Sidebar might not be ready yet, that's ok
-              });
-            }, 500);
-            
-            logger.info('Background', 'Side panel opened to annotations via keyboard shortcut', { 
-              tabId
+          console.error('[Graphiti] Failed to open:', chrome.runtime.lastError.message);
+          logger.error('Background', 'Failed to open annotations', new Error(chrome.runtime.lastError.message));
+        } else {
+          console.log('[Graphiti] Side panel opened, switching to annotations tab...');
+          // Send message to sidebar to switch to annotations tab
+          setTimeout(() => {
+            chrome.runtime.sendMessage({
+              type: 'SWITCH_TO_ANNOTATIONS',
+            }).catch(() => {
+              // Sidebar might not be ready yet, that's ok
             });
-          }
-        });
+          }, 500);
+          
+          logger.info('Background', 'Side panel opened to annotations via keyboard shortcut', { 
+            windowId: window.id
+          });
+        }
       });
     });
   }
