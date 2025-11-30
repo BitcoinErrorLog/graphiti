@@ -392,21 +392,55 @@ chrome.commands.onCommand.addListener((command) => {
   logger.info('Background', 'Command received', { command });
   
   if (command === 'toggle-sidepanel') {
-    // Open the side panel - must be synchronous to preserve user gesture
+    // Toggle the side panel - must be synchronous to preserve user gesture
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
-      if (tab?.windowId) {
-        chrome.sidePanel.open({ windowId: tab.windowId }, () => {
-          if (chrome.runtime.lastError) {
-            logger.error('Background', 'Failed to toggle side panel', new Error(chrome.runtime.lastError.message));
-          } else {
-            logger.info('Background', 'Side panel opened via keyboard shortcut', { 
-              tabId: tab.id,
-              windowId: tab.windowId 
-            });
-          }
-        });
+      if (!tab?.id) {
+        logger.warn('Background', 'No active tab found for side panel toggle');
+        return;
       }
+
+      const tabId = tab.id; // Type guard ensures tabId is number
+
+      // Check current state by trying to get options
+      // We'll use a simple approach: try to disable first, if that fails, enable and open
+      chrome.sidePanel.getOptions({ tabId }, (options) => {
+        const isEnabled = options?.enabled !== false; // Default is enabled
+        
+        if (isEnabled) {
+          // Close the side panel by disabling it
+          chrome.sidePanel.setOptions({
+            tabId,
+            enabled: false
+          }, () => {
+            if (chrome.runtime.lastError) {
+              logger.error('Background', 'Failed to close side panel', new Error(chrome.runtime.lastError.message));
+            } else {
+              logger.info('Background', 'Side panel closed via keyboard shortcut', { tabId });
+            }
+          });
+        } else {
+          // Open the side panel by enabling and opening it
+          chrome.sidePanel.setOptions({
+            tabId,
+            enabled: true,
+            path: 'sidepanel.html'
+          }, () => {
+            if (chrome.runtime.lastError) {
+              logger.error('Background', 'Failed to enable side panel', new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            
+            chrome.sidePanel.open({ tabId }, () => {
+              if (chrome.runtime.lastError) {
+                logger.error('Background', 'Failed to open side panel', new Error(chrome.runtime.lastError.message));
+              } else {
+                logger.info('Background', 'Side panel opened via keyboard shortcut', { tabId });
+              }
+            });
+          });
+        }
+      });
     });
   }
   
@@ -414,8 +448,25 @@ chrome.commands.onCommand.addListener((command) => {
     // Open side panel and switch to annotations tab
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
-      if (tab?.windowId) {
-        chrome.sidePanel.open({ windowId: tab.windowId }, () => {
+      if (!tab?.id) {
+        logger.warn('Background', 'No active tab found for annotations');
+        return;
+      }
+
+      const tabId = tab.id; // Type guard ensures tabId is number
+
+      // Ensure side panel is enabled and open
+      chrome.sidePanel.setOptions({
+        tabId,
+        enabled: true,
+        path: 'sidepanel.html'
+      }, () => {
+        if (chrome.runtime.lastError) {
+          logger.error('Background', 'Failed to set side panel options', new Error(chrome.runtime.lastError.message));
+          return;
+        }
+
+        chrome.sidePanel.open({ tabId }, () => {
           if (chrome.runtime.lastError) {
             logger.error('Background', 'Failed to open annotations', new Error(chrome.runtime.lastError.message));
           } else {
@@ -429,12 +480,11 @@ chrome.commands.onCommand.addListener((command) => {
             }, 500);
             
             logger.info('Background', 'Side panel opened to annotations via keyboard shortcut', { 
-              tabId: tab.id,
-              windowId: tab.windowId 
+              tabId
             });
           }
         });
-      }
+      });
     });
   }
 
