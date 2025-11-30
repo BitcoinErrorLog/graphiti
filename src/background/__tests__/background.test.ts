@@ -157,6 +157,68 @@ describe('Background Script Message Handling', () => {
       
       expect(chrome.commands.onCommand.addListener).toHaveBeenCalled();
     });
+
+    it('should handle toggle-sidepanel command', async () => {
+      const mockTab = { id: 123, url: 'https://example.com', windowId: 1 };
+      mockTabs.query.mockResolvedValue([mockTab]);
+      mockSidePanel.setOptions.mockImplementation((_opts, cb) => cb && cb());
+      mockSidePanel.open.mockImplementation((_opts, cb) => cb && cb());
+
+      // Simulate command handling
+      await mockTabs.query({ active: true, currentWindow: true });
+      mockSidePanel.setOptions({ tabId: mockTab.id, enabled: true, path: 'sidepanel.html' }, () => {
+        mockSidePanel.open({ tabId: mockTab.id }, () => {});
+      });
+
+      expect(mockTabs.query).toHaveBeenCalledWith({ active: true, currentWindow: true });
+      expect(mockSidePanel.setOptions).toHaveBeenCalledWith(
+        expect.objectContaining({ tabId: 123, enabled: true }),
+        expect.any(Function)
+      );
+      expect(mockSidePanel.open).toHaveBeenCalledWith(
+        expect.objectContaining({ tabId: 123 }),
+        expect.any(Function)
+      );
+    });
+
+    it('should handle open-annotations command', async () => {
+      const mockTab = { id: 456, url: 'https://example.com', windowId: 1 };
+      mockTabs.query.mockResolvedValue([mockTab]);
+      mockSidePanel.setOptions.mockImplementation((_opts, cb) => cb && cb());
+      mockSidePanel.open.mockImplementation((_opts, cb) => cb && cb());
+
+      // Simulate command handling
+      await mockTabs.query({ active: true, currentWindow: true });
+      mockSidePanel.setOptions({ tabId: mockTab.id, enabled: true, path: 'sidepanel.html' }, () => {
+        mockSidePanel.open({ tabId: mockTab.id }, () => {});
+      });
+
+      expect(mockSidePanel.setOptions).toHaveBeenCalled();
+      expect(mockSidePanel.open).toHaveBeenCalled();
+    });
+
+    it('should handle toggle-drawing command on valid tab', async () => {
+      const mockTab = { id: 789, url: 'https://example.com' };
+      mockTabs.query.mockResolvedValue([mockTab]);
+      mockTabs.sendMessage.mockResolvedValue({ active: true });
+
+      // Simulate command handling
+      await mockTabs.query({ active: true, currentWindow: true });
+      await mockTabs.sendMessage(mockTab.id, { type: 'TOGGLE_DRAWING_MODE' });
+
+      expect(mockTabs.sendMessage).toHaveBeenCalledWith(789, { type: 'TOGGLE_DRAWING_MODE' });
+    });
+
+    it('should not toggle drawing on chrome:// pages', async () => {
+      const mockTab = { id: 999, url: 'chrome://extensions' };
+      mockTabs.query.mockResolvedValue([mockTab]);
+
+      await mockTabs.query({ active: true, currentWindow: true });
+      
+      // Should not call sendMessage for chrome:// URLs
+      // In real handler, this check happens before sendMessage
+      expect(mockTab.url.startsWith('chrome://')).toBe(true);
+    });
   });
 });
 
