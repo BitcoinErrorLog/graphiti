@@ -1,0 +1,93 @@
+========================================
+Graphiti - Pubky URL Tagger
+Installation Instructions
+========================================
+
+Thank you for downloading Graphiti! This extension lets you draw graffiti on web pages, create text annotations, bookmark URLs, and share everything through the decentralized Pubky network.
+
+REQUIREMENTS
+------------
+- Chrome or Edge browser (Chromium-based)
+- Windows, macOS, or Linux
+
+INSTALLATION STEPS
+------------------
+
+1. Extract the ZIP file
+   - Right-click on "graphiti-extension.zip"
+   - Select "Extract All" (Windows) or double-click (Mac/Linux)
+   - Note the location of the extracted folder
+
+2. Open Chrome/Edge Extensions Page
+   - Chrome: Type "chrome://extensions" in the address bar
+   - Edge: Type "edge://extensions" in the address bar
+   - Or: Menu → Extensions → Manage Extensions
+
+3. Enable Developer Mode
+   - Toggle the "Developer mode" switch in the top-right corner
+   - This enables loading unpacked extensions
+
+4. Load the Extension
+   - Click "Load unpacked" button
+   - Navigate to the extracted folder
+   - Select the folder and click "Select Folder" (or "Open")
+   - The extension should now appear in your extensions list
+
+5. Verify Installation
+   - Look for the Graphiti icon in your browser toolbar
+   - Click the icon to open the extension popup
+   - You should see the Graphiti interface
+
+FIRST TIME SETUP
+----------------
+
+1. Click the Graphiti icon in your toolbar
+2. Sign in with Pubky Ring (optional - you can use local-only mode)
+   - Click "Sign In with Pubky Ring"
+   - Scan the QR code with the Pubky Ring mobile app
+   - Your session will be established automatically
+3. Start using the extension!
+   - Press Alt+D to toggle drawing mode
+   - Select text to create annotations
+   - Click the bookmark button to save URLs
+
+KEYBOARD SHORTCUTS
+------------------
+- Alt+P (Option+P on Mac) - Open extension popup
+- Alt+D (Option+D on Mac) - Toggle drawing mode
+- Alt+S (Option+S on Mac) - Toggle sidebar
+- Alt+A (Option+A on Mac) - Open annotations tab
+
+TROUBLESHOOTING
+---------------
+
+Extension won't load:
+- Make sure you extracted the ZIP file completely
+- Verify you selected the correct folder (should contain manifest.json)
+- Check for error messages on the extensions page
+- Try reloading the extension (click the reload icon)
+
+Drawing mode doesn't work:
+- Reload the extension at chrome://extensions
+- Refresh the webpage you want to draw on
+- Make sure you're on a regular website (not chrome:// pages)
+- Open browser console (F12) and look for "[Graphiti]" messages
+
+Features not syncing:
+- Verify you're signed in (check extension popup)
+- Check your internet connection
+- Look for sync errors in the browser console
+- Use the Debug panel (🔧 button in popup) for details
+
+GETTING HELP
+------------
+- Check the main README.md for detailed documentation
+- Review FEATURES.md for feature documentation
+- Visit the project repository for issues and support
+
+ENJOY GRAPHITI!
+---------------
+Draw freely, annotate wisely, share openly!
+
+For more information, see the README.md file in the extension folder.
+
