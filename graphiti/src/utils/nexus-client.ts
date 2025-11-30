@@ -1,13 +1,29 @@
-import { logger } from './logger';
-
 /**
- * Nexus API Client for querying Pubky posts and users
- * Based on official Nexus API documentation
+ * @fileoverview Nexus API Client for querying Pubky posts and users.
+ * 
+ * Nexus is the indexing service that aggregates data from the Pubky network,
+ * making it searchable and queryable. This client provides methods for:
+ * - Fetching posts and user profiles
+ * - Searching by tags
+ * - Streaming posts with various filters
+ * 
+ * @module utils/nexus-client
+ * @see https://github.com/pubky/pubky-nexus
  */
 
+import { logger } from './logger';
+
+/** Nexus API base URL */
 const NEXUS_API_URL = 'https://nexus.pubky.app';
 
+/**
+ * Post data from Nexus API.
+ * 
+ * Supports both the structured format (with details object)
+ * and legacy flat format for backwards compatibility.
+ */
 export interface NexusPost {
+  /** Structured post details */
   details: {
     id: string;
     author: string;
@@ -73,9 +89,29 @@ export interface UsersStreamResponse {
   cursor?: string;
 }
 
+/**
+ * Client for interacting with the Nexus API.
+ * 
+ * @example
+ * import { nexusClient } from './nexus-client';
+ * 
+ * // Get a user profile
+ * const user = await nexusClient.getUser('abc123');
+ * 
+ * // Stream posts with filters
+ * const { data } = await nexusClient.streamPosts({
+ *   source: 'following',
+ *   observer_id: 'viewer123',
+ *   limit: 20
+ * });
+ */
 class NexusClient {
   private apiUrl: string;
 
+  /**
+   * Creates a new Nexus client.
+   * @param {string} apiUrl - Base URL for the Nexus API
+   */
   constructor(apiUrl: string = NEXUS_API_URL) {
     this.apiUrl = apiUrl;
   }

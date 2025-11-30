@@ -200,82 +200,43 @@ npm run build
 - **Vite** - Lightning-fast build tool
 - **Chrome Extension Manifest V3** - Latest extension API
 - **Pubky Protocol** - Decentralized identity and storage
+- **Vitest** - Fast unit and integration testing
 
 ### File Structure
 
 ```
 graphiti/
 ├── manifest.json              # Chrome extension manifest
-├── package.json              # Dependencies
-├── vite.config.ts            # Build configuration
-├── tailwind.config.js        # Tailwind config
+├── package.json               # Dependencies
+├── vite.config.ts             # Build configuration
+├── vitest.config.ts           # Test configuration
+├── tailwind.config.js         # Tailwind config
 │
 ├── src/
-│   ├── background/           # Background service worker
-│   │   └── background.ts     # Main background script
-│   │
-│   ├── content/              # Content scripts (run on pages)
-│   │   └── content.ts        # Annotations + Drawing manager
-│   │
-│   ├── popup/                # Extension popup
-│   │   ├── App.tsx           # Main popup app
-│   │   ├── main.tsx          # Popup entry point
-│   │   └── components/
-│   │       ├── AuthView.tsx       # QR authentication
-│   │       ├── MainView.tsx       # Main interface
-│   │       ├── DebugPanel.tsx     # Debug logs
-│   │       └── ProfileEditor.tsx  # Profile editing
-│   │
-│   ├── sidepanel/            # Side panel feed
-│   │   ├── App.tsx           # Feed application
-│   │   ├── main.tsx          # Feed entry point
-│   │   └── components/
-│   │       ├── PostCard.tsx       # Post display
-│   │       ├── AnnotationCard.tsx # Annotation display
-│   │       └── EmptyState.tsx     # Empty state UI
-│   │
-│   ├── profile/              # Profile viewer
-│   │   ├── profile-renderer.html
-│   │   └── profile-renderer.ts
-│   │
-│   ├── utils/                # Utilities
-│   │   ├── auth.ts           # Authentication
-│   │   ├── auth-sdk.ts       # Auth with SDK
-│   │   ├── crypto.ts         # Cryptography
-│   │   ├── logger.ts         # Logging system
-│   │   ├── storage.ts        # Storage wrapper
-│   │   ├── annotations.ts    # Annotation storage
-│   │   ├── annotation-sync.ts # Annotation sync
-│   │   ├── drawing-sync.ts   # Drawing sync (NEW!)
-│   │   ├── pubky-api.ts      # Pubky API client
-│   │   ├── pubky-api-sdk.ts  # SDK integration
-│   │   ├── pubky-specs.ts    # Pubky specs
-│   │   ├── nexus-client.ts   # Nexus API client
-│   │   ├── profile-generator.ts # Profile generation
-│   │   ├── profile-manager.ts   # Profile management
-│   │   ├── image-handler.ts     # Image handling
-│   │   └── tag-colors.ts        # Tag color system
-│   │
-│   └── styles/
-│       └── globals.css       # Global styles
+│   ├── background/            # Background service worker
+│   ├── content/               # Content scripts (page injection)
+│   ├── popup/                 # Extension popup UI
+│   ├── sidepanel/             # Side panel feed UI
+│   ├── profile/               # Profile viewer pages
+│   ├── styles/                # Global CSS
+│   ├── utils/                 # Shared utilities
+│   │   ├── __tests__/         # Unit tests
+│   │   ├── crypto.ts          # Cryptography, URL hashing
+│   │   ├── storage.ts         # Chrome storage wrapper
+│   │   ├── pubky-api-sdk.ts   # Pubky homeserver client
+│   │   ├── nexus-client.ts    # Nexus API client
+│   │   └── ...                # Other utilities
+│   └── test/                  # Test setup and mocks
 │
-├── icons/                    # Extension icons
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
+├── docs/                      # Documentation
+│   ├── ARCHITECTURE.md        # System architecture
+│   ├── API_REFERENCE.md       # API documentation
+│   ├── TESTING.md             # Test documentation
+│   ├── UTF16_HASH_ENCODING.md # URL hash spec
+│   └── archive/               # Historical dev notes
 │
-├── dist/                     # Build output
-│   ├── manifest.json
-│   ├── background.js
-│   ├── content.js
-│   ├── popup.html
-│   ├── sidepanel.html
-│   └── assets/
-│
-└── docs/                     # Documentation
-    ├── GRAFFITI_FEATURE.md
-    ├── TROUBLESHOOTING_DRAWING.md
-    └── INSTALLATION_INSTRUCTIONS.md
+├── icons/                     # Extension icons
+└── dist/                      # Build output
 ```
 
 ### Key Components
@@ -427,6 +388,26 @@ rm -rf dist && npm run build
 5. **Check console** (F12) for errors
 
 ### Testing
+
+**Automated Tests:**
+```bash
+# Run all tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests with UI
+npm run test:ui
+```
+
+Tests cover:
+- Crypto utilities (SHA-256, UTF-16 encoding, Base64URL)
+- Storage operations (sessions, bookmarks, tags)
+- API integration (Nexus client, Pubky SDK)
+- React components (popup, sidepanel)
+
+See [docs/TESTING.md](docs/TESTING.md) for detailed test documentation.
 
 **Manual Testing:**
 1. Load extension in Chrome

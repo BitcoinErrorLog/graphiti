@@ -1,246 +1,362 @@
-# Graphiti Features Overview
+# Graphiti Features
 
-## 🔐 Authentication
+Complete documentation of Graphiti extension features.
+
+## Table of Contents
+
+- [Authentication](#authentication)
+- [Drawing Mode](#drawing-mode)
+- [Text Annotations](#text-annotations)
+- [Bookmarks & Tags](#bookmarks--tags)
+- [Social Feed](#social-feed)
+- [Profile System](#profile-system)
+- [Debug Tools](#debug-tools)
+- [Technical Architecture](#technical-architecture)
+
+---
+
+## Authentication
 
 ### Pubky Ring QR-Code Authentication
-- **Click-to-Scan Flow**: Click "Sign In with Pubky Ring" to generate a unique QR code
-- **Secure**: Uses cryptographic client secrets and channel-based relay
-- **Real-time**: Polls for authentication token and establishes session instantly
-- **Mobile-First**: Designed for Pubky Ring mobile app scanning
+
+Secure authentication using the Pubky Ring mobile app.
+
+**Flow:**
+1. Click "Sign In with Pubky Ring" to generate QR code
+2. Scan with Pubky Ring mobile app
+3. Authentication token is encrypted and transmitted via relay
+4. Session is established with your homeserver
 
 **Technical Details:**
-- Generates 32-byte client secret
-- Creates channel ID via SHA-256 hash
-- Builds `pubkyauth://` URL with relay and capabilities
-- Polls HTTP relay at 2-second intervals
-- Decrypts and parses auth token
-- Establishes session with homeserver
+- 32-byte cryptographic client secret
+- SHA-256 channel ID generation
+- `pubkyauth://` URL scheme with relay and capabilities
+- 2-second polling interval
+- XOR-encrypted token transmission
+- Session stored locally with capabilities
 
-## ⭐ Bookmarking
+---
 
-### One-Click Bookmarks
-- **Simple**: Click bookmark button to save current page
-- **Persistent**: Stored both locally and on your homeserver
-- **Visual Feedback**: Shows bookmark status with star icon
-- **Toggle**: Click again to remove bookmark
+## Drawing Mode
 
-**Pubky App Schema:**
-```json
-{
-  "uri": "https://example.com",
-  "created_at": 1234567890
-}
-```
+Draw graffiti directly on any webpage with a persistent canvas overlay.
 
-**Storage Location:** `/pub/pubky.app/bookmarks/{bookmark_id}`
-- ID is deterministic hash of URI
+### How to Use
 
-## 🏷️ Tagging
+1. **Activate**: Press `Alt+D` or click the Drawing button in popup
+2. **Draw**: Click and drag to create strokes
+3. **Customize**: Choose colors and brush thickness in toolbar
+4. **Save**: Click "Save & Exit" or press `Alt+D` again
 
-### Flexible Tag Management
-- **Multi-Tag Support**: Add multiple tags at once
-- **Input Formats**: Comma or space separated
-- **Auto-Normalize**: Lowercase, trimmed, max 20 chars
-- **Visual Display**: Shows existing tags for current page
-- **Persistent**: Stored on homeserver with Pubky App schema
+### Features
 
-**Pubky App Schema:**
-```json
-{
-  "uri": "https://example.com",
-  "label": "webdev",
-  "created_at": 1234567890
-}
-```
-
-**Storage Location:** `/pub/pubky.app/tags/{tag_id}`
-- ID is deterministic hash of `uri:label`
-
-## 📱 Sidebar Feed
-
-### Network Activity View
-- **Context-Aware**: Shows posts about the current URL
-- **Social**: Displays posts from users you follow
-- **Real-time**: Refreshable on-demand
-- **Rich Display**: Shows author info, content, attachments
-
-**Features:**
-- Empty state with helpful tips
-- Post cards with author avatars
-- Timestamp formatting (just now, 5m ago, etc.)
-- Post type icons (link, image, video, etc.)
-- Repost/embed previews
-- Attachment displays
-
-## 🔧 Debug Panel
-
-### Comprehensive Logging System
-- **Real-time Logs**: See all extension activity as it happens
-- **Filterable**: By log level (DEBUG, INFO, WARN, ERROR)
-- **Context-Based**: Logs organized by component
-- **Exportable**: Download logs as JSON
-- **Persistent**: Logs saved to Chrome storage
-
-**Log Levels:**
-- **DEBUG**: Detailed internal operations
-- **INFO**: Important state changes and actions
-- **WARN**: Non-critical issues
-- **ERROR**: Failures with stack traces
-
-**Log Contexts:**
-- `Auth` - Authentication flow
-- `Storage` - Data persistence
-- `PubkyAPI` - API interactions
-- `Crypto` - Cryptographic operations
-- `App` - UI component lifecycle
-- `SidePanel` - Feed operations
-- `Background` - Service worker events
-
-**Features:**
-- Color-coded by severity
-- Timestamps for each entry
-- Data inspection (JSON objects)
-- Error stack traces
-- Export to file
-- Clear all logs
-- Last 50 logs displayed (1000 total buffer)
-
-## 🎨 User Interface
-
-### Modern Design
-- **Gradient Theme**: Blue to purple gradient accents
-- **Tailwind CSS**: Utility-first styling
-- **Responsive**: Adapts to popup and sidepanel
-- **Clear Hierarchy**: Organized sections
-- **Visual Feedback**: Loading states, hover effects
-
-### Popup (400x500px)
-- **Header**: App name, debug toggle
-- **User Info**: Signed-in pubky, sign out
-- **Current Page**: Title and URL display
-- **Quick Actions**: Bookmark, view feed buttons
-- **Tagging Section**: Input, existing tags, add button
-
-### Side Panel
-- **Header**: Title, refresh button, current URL
-- **Feed**: Scrollable post list
-- **Post Cards**: Rich post display
-- **Empty State**: Helpful when no posts found
-
-## 🔒 Security & Privacy
-
-### Secure by Design
-- **Client-Side Encryption**: Auth tokens encrypted with client secret
-- **No Server Storage**: Minimal data stored, most on your homeserver
-- **Session-Based**: Sessions expire (configurable)
-- **Capabilities**: Fine-grained permissions
+- **8-color palette**: Red, Cyan, Blue, Orange, Mint, Yellow, Purple, White
+- **Adjustable brush**: 2-20px thickness
+- **Persistent storage**: Drawings save per URL
+- **Pubky sync**: Automatic backup to homeserver at `/pub/graphiti.dev/drawings/`
 
 ### Data Storage
-**Local (Chrome Storage):**
-- Session info (pubky, sessionId, capabilities)
-- Bookmarks (with homeserver URLs)
-- Tags (with homeserver URLs)
-- Debug logs (max 1000 entries)
 
-**Homeserver:**
-- Bookmarks (via Pubky App schema)
-- Tags (via Pubky App schema)
-- Posts (when implemented)
-
-## 🛠️ Technical Architecture
-
-### Tech Stack
-- **React 18**: UI framework
-- **TypeScript**: Type safety
-- **Tailwind CSS**: Styling
-- **Vite**: Build tool
-- **Chrome Extension Manifest V3**: Latest Chrome APIs
-
-### Module Structure
-```
-src/
-├── popup/          # Main extension popup
-├── sidepanel/      # Side panel feed
-├── background/     # Service worker
-└── utils/          # Shared utilities
-    ├── auth.ts     # Authentication
-    ├── crypto.ts   # Cryptography
-    ├── logger.ts   # Debug logging
-    ├── storage.ts  # Data persistence
-    └── pubky-api.ts # API client
+```typescript
+interface Drawing {
+  id: string;           // Unique identifier
+  url: string;          // Page URL
+  canvasData: string;   // Base64 PNG image
+  timestamp: number;    // Creation time
+  author: string;       // Pubky ID
+  pubkyUrl?: string;    // Homeserver URL after sync
+}
 ```
 
-### Build Output
+### Known Limitations
+
+- Drawings are viewport-dependent
+- Scrolling disabled during drawing
+- Complex SPAs may affect positioning
+
+---
+
+## Text Annotations
+
+Highlight text on webpages and add comments shared as Pubky posts.
+
+### How to Use
+
+1. **Select text** on any webpage
+2. **Click "Add Annotation"** button that appears
+3. **Write your comment** in the modal
+4. **Click "Post Annotation"**
+
+Annotations are visible to all users with the extension!
+
+### Features
+
+- **Persistent highlights**: Yellow background, clickable
+- **Network-wide visibility**: Shared via Pubky posts
+- **Sidebar integration**: View all annotations for current page
+- **Click-to-navigate**: Click annotation card to scroll to highlight
+
+### Architecture
+
+Annotations use a two-phase sync strategy:
+
+1. **Phase 1**: Immediate local save (instant highlight)
+2. **Phase 2**: Background sync to Pubky homeserver
+
+This ensures annotations work even if the network is slow.
+
+### Data Structure
+
+```typescript
+interface Annotation {
+  id: string;
+  url: string;
+  selectedText: string;
+  comment: string;
+  startPath: string;     // DOM XPath
+  endPath: string;
+  startOffset: number;
+  endOffset: number;
+  timestamp: number;
+  author: string;
+  postUri?: string;
+  color: string;
+}
 ```
-dist/
-├── manifest.json           # Extension manifest
-├── popup.html             # Popup entry point
-├── sidepanel.html         # Side panel entry point
-├── background.js          # Service worker
-├── assets/                # Bundled JS/CSS
-└── icons/                 # Extension icons
+
+### Pubky Integration
+
+Annotations are stored as posts with:
+- **Kind**: `short`
+- **Content**: JSON with annotation data
+- **Tags**: URL hash tag + `pubky:annotation`
+
+---
+
+## Bookmarks & Tags
+
+### Bookmarks
+
+One-click bookmarking with Pubky integration.
+
+**How it works:**
+1. Click bookmark button in popup
+2. Extension creates a **Link Post** with the URL
+3. Extension creates a **Bookmark** pointing to that post
+4. Both are indexed by Nexus
+
+**Important Architecture Note:**
+
+Pubky bookmarks must point to **posts**, not external URLs:
+
+```
+HTTP URL (https://example.com)
+    ↓
+Link Post (pubky://.../posts/ABC)  ← Indexed by Nexus
+    ↓
+Bookmark (pubky://.../bookmarks/XYZ) → references Post
+    ↓
+Visible in Pubky App ✅
 ```
 
-## 🚀 Performance
+### Tags
 
-### Optimized
-- **Code Splitting**: Separate bundles for popup and sidepanel
-- **Lazy Loading**: Components loaded on demand
-- **Minimal Bundle**: ~350KB total (58KB gzipped)
-- **Fast Polling**: 2-second auth polling interval
-- **Efficient Storage**: Indexed by URL for fast lookups
+Add custom tags to any URL.
 
-### Bundle Sizes
-- `background.js`: 1.43 KB
-- `popup`: ~21 KB + shared chunks
-- `sidepanel`: ~12 KB + shared chunks
-- `react/react-dom`: ~233 KB (shared)
+**Features:**
+- Multi-tag support (comma or space separated)
+- Auto-normalize: lowercase, trimmed, max 20 chars
+- Stored on homeserver with Pubky App schema
+- Automatic URL hash tag for discovery
 
-## 🔮 Future Enhancements
+### URL Hash Tags
 
-### Planned Features
-- [ ] Real Nexus API integration
-- [ ] DHT-based homeserver resolution
-- [ ] Link post creation (not just bookmarks)
-- [ ] Post comments and interactions
-- [ ] Notification system
-- [ ] Search and filter
-- [ ] Multiple account support
-- [ ] Export/import data
-- [ ] Rich media preview
-- [ ] Offline support
+Every post automatically gets a deterministic hash tag based on the URL. This enables:
+- Fast querying via Nexus
+- Finding posts about the same URL
+- Privacy-preserving (hash doesn't reveal URL)
 
-### API Integration
-Currently uses placeholder implementations for:
-- Homeserver PUT operations (bookmarks, tags, posts)
-- Nexus API queries (posts search, feed)
-- DHT homeserver resolution
+See [UTF-16 Hash Encoding](docs/UTF16_HASH_ENCODING.md) for technical details.
 
-These will be replaced with actual implementations once connected to:
-- Real Pubky homeservers
-- Production Nexus API
-- Pkarr DHT network
+---
 
-## 📊 Debug Information
+## Social Feed
 
-### What Gets Logged
-- All authentication steps
-- Storage operations (save, get, delete)
-- API calls (with parameters)
-- Errors with stack traces
-- User actions (clicks, inputs)
-- Component lifecycle events
+View what your network is sharing about the current page.
 
-### How to Use Debug Logs
-1. Reproduce the issue
-2. Open debug panel
-3. Filter to ERROR level
-4. Export logs
-5. Review or share for troubleshooting
+### Features
+
+- **Context-aware**: Shows posts about current URL
+- **Social graph**: Posts from users you follow
+- **Real-time refresh**: Pull to refresh
+- **Rich display**: Author avatars, timestamps, post types
+- **Tab navigation**: Switch between Posts and Annotations
+
+### Feed Sources
+
+The sidebar queries Nexus using the URL hash tag:
+
+```typescript
+// Generate hash for current page
+const urlHashTag = await generateUrlHashTag(currentUrl);
+
+// Query Nexus
+const posts = await nexusClient.streamPosts({
+  tags: urlHashTag,
+  viewer_id: session.pubky,
+  limit: 50
+});
+```
+
+---
+
+## Profile System
+
+### Profile Editor
+
+Edit your Pubky profile directly from the extension.
+
+**Features:**
+- **Live data loading**: Fetches current profile from homeserver
+- **Emoji picker**: 200+ emojis for status
+- **Link management**: Add social links
+- **Avatar support**: Set profile image URL
+
+**Profile Fields:**
+- Name
+- Bio
+- Avatar URL
+- Status (emoji + text)
+- Links (title + URL pairs)
+
+### Pubky URL Rendering
+
+`pubky://` and `pk://` URLs on web pages are automatically converted to clickable buttons.
+
+**Features:**
+- Beautiful purple gradient buttons
+- Works on dynamic content (SPAs)
+- Opens profile renderer on click
+
+---
+
+## Debug Tools
+
+### Debug Panel
+
+Access via the 🔧 button in popup.
+
+**Features:**
+- Real-time log viewer
+- Filter by level (DEBUG, INFO, WARN, ERROR)
+- Context-based filtering
+- Export logs as JSON
+- Clear all logs
+
+### Log Contexts
+
+- `Auth` - Authentication flow
+- `Storage` - Data persistence
+- `PubkyAPI` / `PubkyAPISDK` - API operations
+- `Crypto` - Cryptographic operations
+- `DrawingManager` - Drawing feature
+- `AnnotationManager` - Annotation feature
+- `Background` - Service worker
+- `SidePanel` - Feed operations
 
 ### Log Retention
-- 1000 logs in memory
+
+- 1000 logs in memory buffer
 - Persisted to Chrome storage
 - Survives extension reload
-- Cleared manually or on uninstall
 
+---
+
+## Technical Architecture
+
+### Technology Stack
+
+- **React 18** - UI framework
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Styling
+- **Vite** - Build tool
+- **Vitest** - Testing
+- **Chrome Extension Manifest V3**
+
+### Extension Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| Background | `src/background/background.ts` | Service worker, message handling |
+| Content | `src/content/content.ts` | Page injection, drawing, annotations |
+| Popup | `src/popup/` | Main UI, auth, quick actions |
+| Sidepanel | `src/sidepanel/` | Feed viewer, annotation browser |
+| Profile | `src/profile/` | Profile rendering |
+
+### Utility Modules
+
+| Module | Purpose |
+|--------|---------|
+| `auth.ts` / `auth-sdk.ts` | Authentication |
+| `crypto.ts` | Cryptographic functions, URL hashing |
+| `storage.ts` | Local storage wrapper |
+| `pubky-api-sdk.ts` | Homeserver operations |
+| `nexus-client.ts` | Nexus API queries |
+| `annotations.ts` | Annotation management |
+| `drawing-sync.ts` | Drawing synchronization |
+| `logger.ts` | Debug logging |
+
+### Data Storage Locations
+
+| Data Type | Local Storage | Homeserver Path |
+|-----------|---------------|-----------------|
+| Session | `session` | - |
+| Bookmarks | `bookmarks` | `/pub/pubky.app/bookmarks/` |
+| Tags | `tags` | `/pub/pubky.app/tags/` |
+| Posts | - | `/pub/pubky.app/posts/` |
+| Drawings | `pubky_drawings` | `/pub/graphiti.dev/drawings/` |
+| Annotations | `pubky_annotations` | As posts with special tags |
+| Profile | `profile` | `/pub/pubky.app/profile.json` |
+| Logs | `debugLogs` | - |
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Alt+P` | Open popup |
+| `Alt+D` | Toggle drawing mode |
+| `Alt+S` | Toggle sidebar |
+| `Alt+A` | Open annotations |
+
+*On Mac, use `Option` instead of `Alt`*
+
+---
+
+## Performance
+
+### Bundle Sizes
+
+- `background.js`: ~1.4 KB
+- `popup`: ~21 KB + shared chunks
+- `sidepanel`: ~12 KB + shared chunks
+- Shared (React): ~233 KB
+
+### Optimizations
+
+- Code splitting for popup/sidepanel
+- Lazy loading of components
+- Debounced DOM observers
+- Indexed local storage lookups
+- Background sync for network operations
+
+---
+
+## Privacy & Security
+
+- **Client-side encryption** for auth tokens
+- **Local-first** data storage
+- **No third-party tracking**
+- **URL hashing** for privacy
+- **Your keys, your data** via Pubky
+
+All data syncs to your personal Pubky homeserver - no central servers.
