@@ -12,6 +12,7 @@
  */
 
 import { logger } from './logger';
+import { withRetry, isRetryableNetworkError } from './retry';
 
 /** Nexus API base URL */
 const NEXUS_API_URL = 'https://nexus.pubky.app';
@@ -45,8 +46,17 @@ export interface NexusPost {
     taggers_count: number;
     relationship: boolean;
   }>;
-  relationships?: any;
-  bookmark?: any;
+  /** Relationship data for the post */
+  relationships?: {
+    following?: boolean;
+    followed_by?: boolean;
+    friends?: boolean;
+  };
+  /** Bookmark data if the viewer has bookmarked this post */
+  bookmark?: {
+    id: string;
+    indexed_at: number;
+  };
   deleted_at?: number;  // Timestamp when post was deleted (legacy format)
   // Legacy flat format support (for backwards compatibility)
   id?: string;
@@ -120,26 +130,30 @@ class NexusClient {
    * Get a specific post
    */
   async getPost(authorId: string, postId: string, viewerId?: string): Promise<NexusPost> {
-    try {
-      let url = `${this.apiUrl}/v0/post/${authorId}/${postId}`;
-      
-      const params = new URLSearchParams();
-      if (viewerId) params.append('viewer_id', viewerId);
-      if (params.toString()) url += '?' + params.toString();
+    let url = `${this.apiUrl}/v0/post/${authorId}/${postId}`;
+    
+    const params = new URLSearchParams();
+    if (viewerId) params.append('viewer_id', viewerId);
+    if (params.toString()) url += '?' + params.toString();
 
-      logger.debug('NexusClient', 'Fetching post', { authorId, postId, url });
+    logger.debug('NexusClient', 'Fetching post', { authorId, postId, url });
 
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      
-      const data = await response.json();
-      logger.info('NexusClient', 'Post fetched successfully', { postId });
-      
-      return data;
-    } catch (error) {
-      logger.error('NexusClient', 'Failed to fetch post', error as Error, { authorId, postId });
-      throw error;
-    }
+    return withRetry(
+      async () => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        
+        const data = await response.json();
+        logger.info('NexusClient', 'Post fetched successfully', { postId });
+        
+        return data;
+      },
+      {
+        maxRetries: 3,
+        context: 'NexusClient.getPost',
+        shouldRetry: isRetryableNetworkError,
+      }
+    );
   }
 
   /**
@@ -274,27 +288,31 @@ class NexusClient {
    * Get a user profile
    */
   async getUser(userId: string, viewerId?: string, depth?: number): Promise<NexusUser> {
-    try {
-      let url = `${this.apiUrl}/v0/user/${userId}`;
-      
-      const params = new URLSearchParams();
-      if (viewerId) params.append('viewer_id', viewerId);
-      if (depth !== undefined) params.append('depth', depth.toString());
-      if (params.toString()) url += '?' + params.toString();
+    let url = `${this.apiUrl}/v0/user/${userId}`;
+    
+    const params = new URLSearchParams();
+    if (viewerId) params.append('viewer_id', viewerId);
+    if (depth !== undefined) params.append('depth', depth.toString());
+    if (params.toString()) url += '?' + params.toString();
 
-      logger.debug('NexusClient', 'Fetching user', { userId, url });
+    logger.debug('NexusClient', 'Fetching user', { userId, url });
 
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      
-      const data = await response.json();
-      logger.info('NexusClient', 'User fetched successfully', { userId });
-      
-      return data;
-    } catch (error) {
-      logger.error('NexusClient', 'Failed to fetch user', error as Error, { userId });
-      throw error;
-    }
+    return withRetry(
+      async () => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        
+        const data = await response.json();
+        logger.info('NexusClient', 'User fetched successfully', { userId });
+        
+        return data;
+      },
+      {
+        maxRetries: 3,
+        context: 'NexusClient.getUser',
+        shouldRetry: isRetryableNetworkError,
+      }
+    );
   }
 
   /**

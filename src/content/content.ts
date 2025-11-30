@@ -1,6 +1,48 @@
 /**
- * Content script that runs on web pages to enable text highlighting and annotations
+ * @fileoverview Content script that runs on web pages to enable interactive features.
+ * 
+ * This file is the main content script that gets injected into web pages.
+ * It contains several major components:
+ * 
+ * ## Architecture
+ * 
+ * The content script is organized into the following modules:
+ * 
+ * 1. **ContentLogger** (line ~6) - Inline logging utility for content script context
+ * 2. **AnnotationManager** (line ~48) - Manages text highlighting and annotations
+ *    - Selection handling
+ *    - Highlight rendering
+ *    - Comment dialogs
+ *    - DOM path tracking for range reconstruction
+ * 3. **DrawingManager** (line ~964) - Canvas-based graffiti/drawing overlay
+ *    - Canvas creation and positioning
+ *    - Drawing tools (pen, eraser)
+ *    - Toolbar UI
+ *    - Drawing persistence
+ * 4. **PubkyURLHandler** (line ~1230) - Handles pubky:// URL conversion to clickable links
+ *    - URL detection and linkification
+ *    - MutationObserver for dynamic content
+ * 
+ * ## Why Not Split Into Separate Files?
+ * 
+ * Content scripts are bundled separately from the main extension.
+ * While these could theoretically be split, keeping them together:
+ * - Avoids complex bundler configuration for content scripts
+ * - Ensures all dependencies are available at runtime
+ * - Simplifies the build process
+ * - Reduces risk of import/export issues in content script context
+ * 
+ * ## Communication
+ * 
+ * Uses chrome.runtime.sendMessage for background script communication.
+ * Keyboard shortcuts: Alt+A (annotations), Alt+D (drawing), Alt+S (sidepanel)
+ * 
+ * @module content/content
  */
+
+// =============================================================================
+// SECTION 1: Logging Utility
+// =============================================================================
 
 // Inline logger to avoid import issues in content script
 class ContentLogger {
@@ -25,7 +67,15 @@ class ContentLogger {
 
 const logger = new ContentLogger();
 
-// Annotation data structure
+// =============================================================================
+// SECTION 2: Annotation Manager
+// =============================================================================
+
+/**
+ * Annotation data structure
+ * Note: This interface is duplicated here because content scripts are bundled separately
+ * and cannot import from utils/. Keep in sync with src/utils/annotations.ts
+ */
 interface Annotation {
   id: string;
   url: string;
@@ -669,9 +719,21 @@ class AnnotationManager {
   }
 }
 
+// =============================================================================
+// SECTION 4: Pubky URL Handler
+// =============================================================================
+
 /**
  * Pubky URL Click Handler
- * Intercepts clicks on pubky:// and pk:// URLs and opens them in profile renderer
+ * 
+ * Intercepts clicks on pubky:// and pk:// URLs and opens them in the profile
+ * renderer. Also linkifies pubky URLs found in page text content.
+ * 
+ * Features:
+ * - Detects pubky:// and pk:// URLs in text content
+ * - Converts them to clickable buttons
+ * - Observes DOM for dynamically added content
+ * - Opens URLs in the extension's profile renderer
  */
 function initPubkyURLHandler() {
   logger.info('ContentScript', 'Initializing Pubky URL handler');
@@ -956,9 +1018,20 @@ function observeDOMForPubkyURLs() {
   });
 }
 
+// =============================================================================
+// SECTION 3: Drawing Manager
+// =============================================================================
+
 /**
  * Drawing Manager
- * Manages canvas-based graffiti drawing overlay on web pages
+ * Manages canvas-based graffiti drawing overlay on web pages.
+ * 
+ * Features:
+ * - Full-page canvas overlay
+ * - Drawing tools (pen, eraser)
+ * - Color picker and stroke width
+ * - Save/load drawings to Chrome storage
+ * - Sync drawings to Pubky homeserver
  */
 class DrawingManager {
   private canvas: HTMLCanvasElement | null = null;

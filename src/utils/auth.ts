@@ -6,6 +6,7 @@ import {
   base64UrlEncode,
   decryptAuthToken,
   parseAuthToken,
+  AuthToken,
 } from './crypto';
 
 /**
@@ -185,7 +186,7 @@ class AuthManager {
   /**
    * Create a session with the homeserver
    */
-  private async createSession(homeserver: string, authToken: any): Promise<Session> {
+  private async createSession(homeserver: string, authToken: AuthToken): Promise<Session> {
     try {
       logger.info('Auth', 'Creating session with homeserver', { homeserver });
 

@@ -6,6 +6,20 @@
  * - Persists logs to Chrome storage
  * - Supports log export and clearing
  * 
+ * ## Security Guidelines
+ * 
+ * When logging, **NEVER** include:
+ * - Auth tokens or secrets
+ * - Full session objects (use `{ pubky: session.pubky }` instead)
+ * - Passwords or private keys
+ * - Encrypted/raw token bytes
+ * 
+ * Safe to log:
+ * - Public keys (pubky IDs)
+ * - URLs (for debugging)
+ * - Operation names and counts
+ * - Error messages (without stack traces containing secrets)
+ * 
  * @module utils/logger
  */
 
@@ -24,7 +38,7 @@ interface LogEntry {
   level: LogLevel;
   context: string;
   message: string;
-  data?: any;
+  data?: unknown;
   error?: Error;
 }
 
@@ -63,7 +77,7 @@ class Logger {
     }
   }
 
-  private log(level: LogLevel, context: string, message: string, data?: any, error?: Error) {
+  private log(level: LogLevel, context: string, message: string, data?: unknown, error?: Error) {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level,
@@ -110,19 +124,19 @@ class Logger {
     }
   }
 
-  debug(context: string, message: string, data?: any) {
+  debug(context: string, message: string, data?: unknown) {
     this.log(LogLevel.DEBUG, context, message, data);
   }
 
-  info(context: string, message: string, data?: any) {
+  info(context: string, message: string, data?: unknown) {
     this.log(LogLevel.INFO, context, message, data);
   }
 
-  warn(context: string, message: string, data?: any) {
+  warn(context: string, message: string, data?: unknown) {
     this.log(LogLevel.WARN, context, message, data);
   }
 
-  error(context: string, message: string, error?: Error, data?: any) {
+  error(context: string, message: string, error?: Error, data?: unknown) {
     this.log(LogLevel.ERROR, context, message, data, error);
   }
 

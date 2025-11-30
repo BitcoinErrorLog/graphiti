@@ -21,6 +21,26 @@ await storage.getSession(): Promise<Session | null>
 await storage.clearSession(): Promise<void>
 ```
 
+**Example: Check authentication status**
+
+```typescript
+import { storage } from './utils/storage';
+
+async function isAuthenticated(): Promise<boolean> {
+  const session = await storage.getSession();
+  if (!session) return false;
+  
+  // Check if session is expired (24 hours)
+  const expired = Date.now() - session.timestamp > 24 * 60 * 60 * 1000;
+  if (expired) {
+    await storage.clearSession();
+    return false;
+  }
+  
+  return true;
+}
+```
+
 ### Bookmark Methods
 
 ```typescript
@@ -40,6 +60,40 @@ await storage.getBookmark(url: string): Promise<StoredBookmark | null>
 
 // Remove bookmark
 await storage.removeBookmark(url: string): Promise<void>
+```
+
+**Example: Toggle bookmark for current page**
+
+```typescript
+import { storage, StoredBookmark } from './utils/storage';
+import { pubkyAPISDK } from './utils/pubky-api-sdk';
+
+async function toggleBookmark(url: string, title: string): Promise<boolean> {
+  const existing = await storage.getBookmark(url);
+  
+  if (existing) {
+    // Remove from homeserver and local storage
+    if (existing.postUri) {
+      await pubkyAPISDK.deleteBookmark(existing.postUri);
+    }
+    await storage.removeBookmark(url);
+    return false; // Unbookmarked
+  } else {
+    // Create on homeserver and save locally
+    const { fullPath, bookmarkId, postUri } = await pubkyAPISDK.createBookmark(url);
+    
+    const bookmark: StoredBookmark = {
+      url,
+      title,
+      timestamp: Date.now(),
+      pubkyUrl: fullPath,
+      bookmarkId,
+      postUri,
+    };
+    await storage.saveBookmark(bookmark);
+    return true; // Bookmarked
+  }
+}
 ```
 
 ### Tag Methods
@@ -123,6 +177,26 @@ import { generateUrlHashTag } from './utils/crypto';
 // Generate deterministic hash tag for URL
 const hashTag = await generateUrlHashTag(url: string): Promise<string>
 // Returns 10-character UTF-16 encoded hash
+```
+
+**Example: Search for posts about a URL**
+
+```typescript
+import { generateUrlHashTag } from './utils/crypto';
+import { nexusClient } from './utils/nexus-client';
+
+async function findPostsAboutUrl(url: string): Promise<NexusPost[]> {
+  // Generate the deterministic hash tag for this URL
+  const urlTag = await generateUrlHashTag(url);
+  
+  // Search Nexus for posts with this tag
+  const posts = await nexusClient.searchPostsByTag(urlTag, {
+    sorting: 'latest',
+    limit: 50,
+  });
+  
+  return posts;
+}
 ```
 
 ### Hashing
@@ -330,6 +404,36 @@ const json = await logger.exportLogs(): Promise<string>
 
 // Clear logs
 await logger.clearLogs(): Promise<void>
+```
+
+**Example: Logging in an async operation**
+
+```typescript
+import { logger } from './utils/logger';
+
+async function syncAnnotations(): Promise<void> {
+  logger.info('Sync', 'Starting annotation sync');
+  
+  try {
+    const annotations = await getLocalAnnotations();
+    logger.debug('Sync', 'Found local annotations', { count: annotations.length });
+    
+    for (const annotation of annotations) {
+      if (!annotation.postUri) {
+        await uploadAnnotation(annotation);
+        logger.info('Sync', 'Uploaded annotation', { id: annotation.id });
+      }
+    }
+    
+    logger.info('Sync', 'Sync completed successfully');
+  } catch (error) {
+    logger.error('Sync', 'Sync failed', error as Error, { 
+      phase: 'upload',
+      timestamp: Date.now(),
+    });
+    throw error;
+  }
+}
 ```
 
 ---
