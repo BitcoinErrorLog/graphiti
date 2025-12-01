@@ -171,6 +171,17 @@ function App() {
   const handleAnnotationClick = (annotation: Annotation) => {
     logger.info('SidePanel', 'Annotation clicked', { id: annotation.id, url: annotation.url });
     
+    // Helper to safely send message with error handling
+    const sendHighlightMessage = (tabId: number) => {
+      chrome.tabs.sendMessage(tabId, {
+        type: 'HIGHLIGHT_ANNOTATION',
+        annotationId: annotation.id,
+      }).catch((error) => {
+        // Content script not loaded - this is expected on chrome:// pages or after extension reload
+        logger.warn('SidePanel', 'Could not send highlight message - refresh the page', { error: error.message });
+      });
+    };
+    
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const currentTab = tabs[0];
       if (!currentTab?.id) return;
@@ -182,10 +193,7 @@ function App() {
       
       if (currentUrl === annotationUrl) {
         // Already on the page, just highlight
-        chrome.tabs.sendMessage(currentTab.id, {
-          type: 'HIGHLIGHT_ANNOTATION',
-          annotationId: annotation.id,
-        });
+        sendHighlightMessage(currentTab.id);
       } else if (annotation.url) {
         // Navigate to the page first, then highlight after it loads
         logger.info('SidePanel', 'Navigating to annotation page', { url: annotation.url });
@@ -197,10 +205,7 @@ function App() {
               chrome.tabs.onUpdated.removeListener(listener);
               // Delay to ensure content script is ready
               setTimeout(() => {
-                chrome.tabs.sendMessage(tabId, {
-                  type: 'HIGHLIGHT_ANNOTATION',
-                  annotationId: annotation.id,
-                });
+                sendHighlightMessage(tabId);
               }, 500);
             }
           };
