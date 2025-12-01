@@ -41,13 +41,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   logger.debug('Background', 'Message received', { message, sender: sender.id });
 
   if (message.type === 'OPEN_SIDE_PANEL') {
-    // Open side panel for the current tab
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.sidePanel.open({ tabId: tabs[0].id });
-        logger.info('Background', 'Side panel opened', { tabId: tabs[0].id });
-      }
-    });
+    // Note: sidePanel.open() requires user gesture - the popup should call it directly
+    // This handler exists for backwards compatibility but may fail without user gesture
+    logger.info('Background', 'OPEN_SIDE_PANEL received - popup should call sidePanel.open() directly');
     sendResponse({ success: true });
   }
 
@@ -78,19 +74,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'SHOW_ANNOTATION') {
-    // Open side panel and notify it to show the annotation
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.sidePanel.open({ tabId: tabs[0].id });
-        // Notify sidebar to scroll to the annotation
-        setTimeout(() => {
-          chrome.runtime.sendMessage({
-            type: 'SCROLL_TO_ANNOTATION',
-            annotationId: message.annotationId,
-          });
-        }, 500);
-      }
+    // Note: sidePanel.open() requires user gesture - can't open from content script click
+    // Just notify sidebar to scroll to the annotation (if it's already open)
+    chrome.runtime.sendMessage({
+      type: 'SCROLL_TO_ANNOTATION',
+      annotationId: message.annotationId,
     });
+    logger.info('Background', 'Scroll to annotation requested', { annotationId: message.annotationId });
     sendResponse({ success: true });
   }
 
