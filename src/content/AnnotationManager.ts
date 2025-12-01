@@ -477,6 +477,15 @@ export class AnnotationManager {
             suffix: annotation.suffix,
           });
 
+          // textQuote.toRange() returns null if text not found
+          if (!range) {
+            logger.warn('ContentScript', 'Text not found on page for annotation', { 
+              id: annotation.id, 
+              exact: annotation.exact?.substring(0, 50) 
+            });
+            return;
+          }
+
           const span = document.createElement('span');
           span.className = this.highlightClass;
           span.dataset.annotationId = annotation.id;
@@ -487,12 +496,16 @@ export class AnnotationManager {
             logger.info('ContentScript', 'Highlight rendered successfully with text-quote ✓', { id: annotation.id });
             return;
           } catch (error) {
-            // Try alternative method
-            const contents = range.extractContents();
-            span.appendChild(contents);
-            range.insertNode(span);
-            logger.info('ContentScript', 'Highlight rendered with alt method ✓', { id: annotation.id });
-            return;
+            // Try alternative method for complex DOM structures
+            try {
+              const contents = range.extractContents();
+              span.appendChild(contents);
+              range.insertNode(span);
+              logger.info('ContentScript', 'Highlight rendered with alt method ✓', { id: annotation.id });
+              return;
+            } catch (altError) {
+              logger.warn('ContentScript', 'Alt highlight method also failed', { id: annotation.id });
+            }
           }
         } catch (error) {
           logger.warn('ContentScript', 'Text-quote anchoring failed, trying legacy format', error);
