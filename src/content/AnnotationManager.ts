@@ -448,7 +448,8 @@ export class AnnotationManager {
   } {
     try {
       // Use text-quote anchoring library to create robust anchors
-      const selector = textQuote.toTextQuote(document.body, range);
+      // API: fromRange(root, range) returns { exact, prefix, suffix }
+      const selector = textQuote.fromRange(document.body, range);
       return {
         prefix: selector.prefix || '',
         exact: selector.exact,
