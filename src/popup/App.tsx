@@ -136,8 +136,13 @@ function App() {
   };
 
   const handleOpenSidePanel = () => {
-    chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL' });
-    logger.info('App', 'Opening side panel');
+    // Open side panel directly from popup (user gesture is preserved)
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.sidePanel.open({ tabId: tabs[0].id });
+        logger.info('App', 'Side panel opened');
+      }
+    });
   };
 
   const handleEditProfile = () => {
