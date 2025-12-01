@@ -169,14 +169,42 @@ function App() {
   };
 
   const handleAnnotationClick = (annotation: Annotation) => {
-    logger.info('SidePanel', 'Annotation clicked, highlighting on page', { id: annotation.id });
+    logger.info('SidePanel', 'Annotation clicked', { id: annotation.id, url: annotation.url });
     
-    // Send message to content script to highlight the annotation on the page
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
+      const currentTab = tabs[0];
+      if (!currentTab?.id) return;
+
+      // Normalize URLs for comparison (remove hash and query params)
+      const normalizeUrl = (url: string | undefined) => url?.split('#')[0].split('?')[0];
+      const currentUrl = normalizeUrl(currentTab.url);
+      const annotationUrl = normalizeUrl(annotation.url);
+      
+      if (currentUrl === annotationUrl) {
+        // Already on the page, just highlight
+        chrome.tabs.sendMessage(currentTab.id, {
           type: 'HIGHLIGHT_ANNOTATION',
           annotationId: annotation.id,
+        });
+      } else if (annotation.url) {
+        // Navigate to the page first, then highlight after it loads
+        logger.info('SidePanel', 'Navigating to annotation page', { url: annotation.url });
+        const tabId = currentTab.id;
+        chrome.tabs.update(tabId, { url: annotation.url }, () => {
+          // Wait for page to load before highlighting
+          const listener = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+            if (updatedTabId === tabId && changeInfo.status === 'complete') {
+              chrome.tabs.onUpdated.removeListener(listener);
+              // Delay to ensure content script is ready
+              setTimeout(() => {
+                chrome.tabs.sendMessage(tabId, {
+                  type: 'HIGHLIGHT_ANNOTATION',
+                  annotationId: annotation.id,
+                });
+              }, 500);
+            }
+          };
+          chrome.tabs.onUpdated.addListener(listener);
         });
       }
     });
