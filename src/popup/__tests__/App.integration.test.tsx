@@ -61,10 +61,15 @@ vi.mock('../../utils/drawing-sync', () => ({
 }));
 
 // Mock Chrome APIs
+const mockTabData = [{ id: 123, url: 'https://example.com', title: 'Example Site' }];
 const mockTabs = {
-  query: vi.fn().mockResolvedValue([
-    { url: 'https://example.com', title: 'Example Site' },
-  ]),
+  query: vi.fn((_options: unknown, callback?: (tabs: typeof mockTabData) => void) => {
+    // Support both callback and promise styles
+    if (callback) {
+      callback(mockTabData);
+    }
+    return Promise.resolve(mockTabData);
+  }),
   sendMessage: vi.fn(),
 };
 
@@ -80,10 +85,15 @@ const mockStorage = {
   },
 };
 
+const mockSidePanel = {
+  open: vi.fn(),
+};
+
 (globalThis as any).chrome = {
   tabs: mockTabs,
   runtime: mockRuntime,
   storage: mockStorage,
+  sidePanel: mockSidePanel,
 };
 
 // Mock alert
@@ -377,15 +387,15 @@ describe('Popup App Integration', () => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
       });
 
-      // Find side panel button
+      // Find side panel button (View Feed button)
       const sidePanelButton = screen.queryByRole('button', { name: /feed|side/i });
       if (sidePanelButton) {
         fireEvent.click(sidePanelButton);
 
         await waitFor(() => {
-          expect(mockRuntime.sendMessage).toHaveBeenCalledWith({
-            type: 'OPEN_SIDE_PANEL',
-          });
+          // Now opens side panel directly instead of sending message
+          expect(mockTabs.query).toHaveBeenCalledWith({ active: true, currentWindow: true });
+          expect(mockSidePanel.open).toHaveBeenCalledWith({ tabId: 123 });
         });
       }
     });
