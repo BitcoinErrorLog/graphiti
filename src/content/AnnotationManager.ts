@@ -42,7 +42,13 @@ export class AnnotationManager {
     this.injectStyles();
     document.addEventListener('mouseup', this.handleTextSelection.bind(this));
     chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
-    this.loadAnnotations();
+    
+    // Delay initial annotation load to allow dynamic content to load (SPAs)
+    // This is especially important for sites like pubky.app that load content asynchronously
+    setTimeout(() => {
+      this.loadAnnotations();
+    }, 500);
+    
     this.observeUrlChanges();
     this.observeContentChanges();
     logger.info('ContentScript', 'Annotation manager initialized');
@@ -95,8 +101,12 @@ export class AnnotationManager {
       contentChangeTimeout = window.setTimeout(() => {
         if (this.annotations.length > 0) {
           const visibleHighlights = document.querySelectorAll(`.${this.highlightClass}`).length;
-          if (visibleHighlights === 0) {
-            logger.info('ContentScript', 'Content changed, re-rendering highlights');
+          // Re-render if we have fewer highlights than annotations (some failed to render)
+          if (visibleHighlights < this.annotations.length) {
+            logger.info('ContentScript', 'Content changed, re-rendering missing highlights', {
+              annotations: this.annotations.length,
+              visible: visibleHighlights
+            });
             this.annotations.forEach(annotation => {
               this.renderHighlight(annotation);
             });
@@ -471,17 +481,35 @@ export class AnnotationManager {
       // Try new text-quote format first
       if (annotation.prefix !== undefined && annotation.exact !== undefined && annotation.suffix !== undefined) {
         try {
-          const range = textQuote.toRange(document.body, {
+          // First try with full context (prefix + exact + suffix)
+          let range = textQuote.toRange(document.body, {
             prefix: annotation.prefix,
             exact: annotation.exact,
             suffix: annotation.suffix,
           });
 
+          // If not found, try with just the exact text (no prefix/suffix)
+          // This helps when surrounding context has changed
+          if (!range && annotation.exact) {
+            logger.debug('ContentScript', 'Retrying without prefix/suffix context', { id: annotation.id });
+            range = textQuote.toRange(document.body, {
+              prefix: '',
+              exact: annotation.exact,
+              suffix: '',
+            });
+          }
+
           // textQuote.toRange() returns null if text not found
           if (!range) {
+            // Log more details for debugging
+            const pageText = document.body.textContent || '';
+            const exactInPage = pageText.includes(annotation.exact);
             logger.warn('ContentScript', 'Text not found on page for annotation', { 
               id: annotation.id, 
-              exact: annotation.exact?.substring(0, 50) 
+              exact: annotation.exact?.substring(0, 50),
+              exactExistsInPageText: exactInPage,
+              prefix: annotation.prefix?.substring(0, 20),
+              suffix: annotation.suffix?.substring(0, 20),
             });
             return;
           }
