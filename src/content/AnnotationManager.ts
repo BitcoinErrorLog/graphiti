@@ -500,15 +500,28 @@ export class AnnotationManager {
             });
           }
 
+          // If still not found and selectedText differs from exact, try with selectedText
+          if (!range && annotation.selectedText && annotation.selectedText !== annotation.exact) {
+            logger.debug('ContentScript', 'Retrying with selectedText', { id: annotation.id });
+            range = textQuote.toRange(document.body, {
+              prefix: '',
+              exact: annotation.selectedText,
+              suffix: '',
+            });
+          }
+
           // textQuote.toRange() returns null if text not found
           if (!range) {
             // Log more details for debugging
             const pageText = document.body.textContent || '';
-            const exactInPage = pageText.includes(annotation.exact);
+            const exactInPage = pageText.includes(annotation.exact || '');
+            const selectedInPage = pageText.includes(annotation.selectedText || '');
             logger.warn('ContentScript', 'Text not found on page for annotation', { 
               id: annotation.id, 
               exact: annotation.exact?.substring(0, 50),
+              selectedText: annotation.selectedText?.substring(0, 50),
               exactExistsInPageText: exactInPage,
+              selectedExistsInPageText: selectedInPage,
               prefix: annotation.prefix?.substring(0, 20),
               suffix: annotation.suffix?.substring(0, 20),
             });
