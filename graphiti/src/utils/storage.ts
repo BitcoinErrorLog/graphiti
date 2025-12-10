@@ -16,6 +16,10 @@
  */
 
 import { logger } from './logger';
+import ErrorHandler from './error-handler';
+import { STORAGE_CONSTANTS, TIMING_CONSTANTS } from './constants';
+import { getStorageValue, setStorageValue, removeStorageValue } from './storage-helpers';
+import { toError } from './type-guards';
 
 /**
  * User session data from Pubky authentication.
@@ -160,30 +164,24 @@ class Storage {
   // Session management
   async saveSession(session: Session): Promise<void> {
     try {
-      await chrome.storage.local.set({ session });
+      await setStorageValue(STORAGE_CONSTANTS.KEYS.SESSION, session);
       logger.info('Storage', 'Session saved', { pubky: session.pubky });
     } catch (error) {
-      logger.error('Storage', 'Failed to save session', error as Error);
+      logger.error('Storage', 'Failed to save session', toError(error));
       throw error;
     }
   }
 
   async getSession(): Promise<Session | null> {
-    try {
-      const result = await chrome.storage.local.get('session');
-      return result.session || null;
-    } catch (error) {
-      logger.error('Storage', 'Failed to get session', error as Error);
-      return null;
-    }
+    return await getStorageValue<Session>(STORAGE_CONSTANTS.KEYS.SESSION, null);
   }
 
   async clearSession(): Promise<void> {
     try {
-      await chrome.storage.local.remove('session');
+      await removeStorageValue(STORAGE_CONSTANTS.KEYS.SESSION);
       logger.info('Storage', 'Session cleared');
     } catch (error) {
-      logger.error('Storage', 'Failed to clear session', error as Error);
+      logger.error('Storage', 'Failed to clear session', toError(error));
       throw error;
     }
   }
@@ -193,7 +191,7 @@ class Storage {
     try {
       const bookmarks = await this.getBookmarks();
       bookmarks.push(bookmark);
-      await chrome.storage.local.set({ bookmarks });
+      await setStorageValue(STORAGE_CONSTANTS.KEYS.BOOKMARKS, bookmarks);
       logger.info('Storage', 'Bookmark saved', { url: bookmark.url });
     } catch (error) {
       logger.error('Storage', 'Failed to save bookmark', error as Error);
@@ -202,13 +200,8 @@ class Storage {
   }
 
   async getBookmarks(): Promise<StoredBookmark[]> {
-    try {
-      const result = await chrome.storage.local.get('bookmarks');
-      return result.bookmarks || [];
-    } catch (error) {
-      logger.error('Storage', 'Failed to get bookmarks', error as Error);
-      return [];
-    }
+    const bookmarks = await getStorageValue<StoredBookmark[]>(STORAGE_CONSTANTS.KEYS.BOOKMARKS, []);
+    return bookmarks || [];
   }
 
   async isBookmarked(url: string): Promise<boolean> {
@@ -225,7 +218,7 @@ class Storage {
     try {
       const bookmarks = await this.getBookmarks();
       const filtered = bookmarks.filter(b => b.url !== url);
-      await chrome.storage.local.set({ bookmarks: filtered });
+      await setStorageValue(STORAGE_CONSTANTS.KEYS.BOOKMARKS, filtered);
       logger.info('Storage', 'Bookmark removed', { url });
     } catch (error) {
       logger.error('Storage', 'Failed to remove bookmark', error as Error);
@@ -245,7 +238,7 @@ class Storage {
         label: label.toLowerCase().trim(),
         timestamp: Date.now(),
       }));
-      await chrome.storage.local.set({ tags: [...filteredTags, ...newTags] });
+      await setStorageValue(STORAGE_CONSTANTS.KEYS.TAGS, [...filteredTags, ...newTags]);
       logger.info('Storage', 'Tags saved', { url, tags });
     } catch (error) {
       logger.error('Storage', 'Failed to save tags', error as Error);
@@ -254,13 +247,8 @@ class Storage {
   }
 
   async getAllTags(): Promise<StoredTag[]> {
-    try {
-      const result = await chrome.storage.local.get('tags');
-      return result.tags || [];
-    } catch (error) {
-      logger.error('Storage', 'Failed to get tags', error as Error);
-      return [];
-    }
+    const tags = await getStorageValue<StoredTag[]>(STORAGE_CONSTANTS.KEYS.TAGS, []);
+    return tags || [];
   }
 
   async getTagsForUrl(url: string): Promise<string[]> {
@@ -273,7 +261,7 @@ class Storage {
   // Profile management
   async saveProfile(profile: ProfileData): Promise<void> {
     try {
-      await chrome.storage.local.set({ profile });
+      await setStorageValue(STORAGE_CONSTANTS.KEYS.PROFILE, profile);
       logger.info('Storage', 'Profile saved', { name: profile.name });
     } catch (error) {
       logger.error('Storage', 'Failed to save profile', error as Error);
@@ -282,16 +270,10 @@ class Storage {
   }
 
   async getProfile(): Promise<ProfileData | null> {
-    try {
-      const result = await chrome.storage.local.get('profile');
-      return result.profile || null;
-    } catch (error) {
-      logger.error('Storage', 'Failed to get profile', error as Error);
-      return null;
-    }
+    return await getStorageValue<ProfileData>(STORAGE_CONSTANTS.KEYS.PROFILE, null);
   }
 
-  async cacheProfile(pubkey: string, profile: ProfileData, ttl: number = 3600000): Promise<void> {
+  async cacheProfile(pubkey: string, profile: ProfileData, ttl: number = TIMING_CONSTANTS.PROFILE_CACHE_TTL): Promise<void> {
     try {
       const cached: CachedProfile = {
         data: profile,
@@ -353,13 +335,92 @@ class Storage {
   // Drawings
   async saveDrawing(drawing: Drawing): Promise<void> {
     try {
+      // Check storage quota before saving
+      const quotaCheck = await this.checkStorageQuota();
+      
+      // Warn if storage is getting full, but don't block save unless critical
+      if (quotaCheck.percentUsed >= 90) {
+        logger.warn('Storage', 'Storage quota critical', {
+          percentUsed: quotaCheck.percentUsed.toFixed(1),
+          usedMB: quotaCheck.usedMB.toFixed(2),
+          quotaMB: quotaCheck.quotaMB.toFixed(2),
+        });
+        // Still try to save - let Chrome handle the error if truly full
+      } else if (quotaCheck.percentUsed >= 75) {
+        logger.warn('Storage', 'Storage quota warning', {
+          percentUsed: quotaCheck.percentUsed.toFixed(1),
+          usedMB: quotaCheck.usedMB.toFixed(2),
+          quotaMB: quotaCheck.quotaMB.toFixed(2),
+        });
+      }
+      
       const drawings = await this.getAllDrawings();
       drawings[drawing.url] = drawing;
-      await chrome.storage.local.set({ pubky_drawings: drawings });
-      logger.info('Storage', 'Drawing saved', { url: drawing.url });
+      
+      try {
+        await chrome.storage.local.set({ pubky_drawings: drawings });
+        logger.info('Storage', 'Drawing saved', { 
+          url: drawing.url, 
+          storageUsed: `${quotaCheck.usedMB.toFixed(2)}MB`,
+          percentUsed: `${quotaCheck.percentUsed.toFixed(1)}%`,
+        });
+      } catch (setError: any) {
+        // Chrome will throw if quota truly exceeded
+        if (setError?.message?.includes('quota') || setError?.message?.includes('QUOTA')) {
+          ErrorHandler.handleAndThrow(setError, {
+            context: 'Storage',
+            data: {
+              operation: 'saveDrawing',
+              usedMB: quotaCheck.usedMB,
+              quotaMB: quotaCheck.quotaMB,
+              percentUsed: quotaCheck.percentUsed,
+            },
+            userMessage: `Storage quota exceeded. Used: ${quotaCheck.usedMB.toFixed(2)}MB / ${quotaCheck.quotaMB.toFixed(2)}MB. Please delete some drawings to free up space.`,
+          });
+        }
+        ErrorHandler.handleAndThrow(setError, {
+          context: 'Storage',
+          data: { operation: 'saveDrawing' },
+        });
+      }
     } catch (error) {
       logger.error('Storage', 'Failed to save drawing', error as Error);
       throw error;
+    }
+  }
+
+  /**
+   * Check storage quota and usage
+   */
+  async checkStorageQuota(): Promise<{ hasSpace: boolean; usedMB: number; quotaMB: number; percentUsed: number }> {
+    try {
+      const bytesInUse = await chrome.storage.local.getBytesInUse();
+      const quotaBytes = chrome.storage.local.QUOTA_BYTES || STORAGE_CONSTANTS.STORAGE_QUOTA_BYTES;
+      
+      const usedMB = bytesInUse / (1024 * 1024);
+      const quotaMB = quotaBytes / (1024 * 1024);
+      const percentUsed = (bytesInUse / quotaBytes) * 100;
+      
+      // Warn if over threshold
+      const hasSpace = percentUsed < STORAGE_CONSTANTS.STORAGE_CRITICAL_THRESHOLD;
+      
+      if (percentUsed > STORAGE_CONSTANTS.STORAGE_WARNING_THRESHOLD) {
+        logger.warn('Storage', 'Storage quota warning', { 
+          usedMB: usedMB.toFixed(2), 
+          quotaMB: quotaMB.toFixed(2),
+          percentUsed: percentUsed.toFixed(1)
+        });
+      }
+      
+      return {
+        hasSpace,
+        usedMB,
+        quotaMB,
+        percentUsed,
+      };
+    } catch (error) {
+      logger.error('Storage', 'Failed to check storage quota', error as Error);
+      return { hasSpace: true, usedMB: 0, quotaMB: 5, percentUsed: 0 };
     }
   }
 
@@ -374,13 +435,8 @@ class Storage {
   }
 
   async getAllDrawings(): Promise<{ [url: string]: Drawing }> {
-    try {
-      const result = await chrome.storage.local.get('pubky_drawings');
-      return result.pubky_drawings || {};
-    } catch (error) {
-      logger.error('Storage', 'Failed to get all drawings', error as Error);
-      return {};
-    }
+    const drawings = await getStorageValue<{ [url: string]: Drawing }>(STORAGE_CONSTANTS.KEYS.DRAWINGS, {});
+    return drawings || {};
   }
 
   async deleteDrawing(url: string): Promise<void> {

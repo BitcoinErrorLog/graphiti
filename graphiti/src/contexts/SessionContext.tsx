@@ -8,7 +8,7 @@ interface SessionContextType {
   loading: boolean;
   setSession: (session: Session | null) => void;
   signOut: () => Promise<void>;
-  refreshSession: () => Promise<void>;
+  refreshSession: () => Promise<Session | null>;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -29,7 +29,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
     refreshSession();
   }, []);
 
-  const refreshSession = async (): Promise<void> => {
+  const refreshSession = async (): Promise<Session | null> => {
     try {
       setLoading(true);
       const existingSession = await authManagerSDK.getSession();
@@ -37,9 +37,11 @@ export function SessionProvider({ children }: SessionProviderProps) {
       logger.debug('SessionContext', 'Session refreshed', { 
         hasSession: !!existingSession 
       });
+      return existingSession;
     } catch (error) {
       logger.error('SessionContext', 'Failed to refresh session', error as Error);
       setSession(null);
+      return null;
     } finally {
       setLoading(false);
     }

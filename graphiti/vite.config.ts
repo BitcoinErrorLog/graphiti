@@ -39,11 +39,15 @@ export default defineConfig({
   plugins: [react(), copyStaticFiles()],
   build: {
     outDir: 'dist',
+    sourcemap: true,
+    minify: 'esbuild', // Use esbuild for faster minification
+    target: 'es2020', // Target modern browsers
     rollupOptions: {
       input: {
         popup: resolve(__dirname, 'popup.html'),
         sidepanel: resolve(__dirname, 'sidepanel.html'),
         'profile-renderer': resolve(__dirname, 'src/profile/profile-renderer.html'),
+        offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
         background: resolve(__dirname, 'src/background/background.ts'),
         content: resolve(__dirname, 'src/content/content.ts'),
       },
@@ -55,15 +59,31 @@ export default defineConfig({
           if (chunkInfo.name === 'content') {
             return 'content.js';
           }
+          if (chunkInfo.name === 'offscreen') {
+            return 'src/offscreen/offscreen.js';
+          }
           return 'assets/[name]-[hash].js';
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
         format: 'es', // Default format for most files
+        manualChunks: (id) => {
+          // Vendor chunks for better caching
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('@synonymdev/pubky')) {
+              return 'vendor-pubky';
+            }
+            if (id.includes('pubky-app-specs')) {
+              return 'vendor-pubky-specs';
+            }
+            return 'vendor-other';
+          }
+        },
       },
     },
-    sourcemap: true,
-    minify: false,
   },
   resolve: {
     alias: {
@@ -71,4 +91,3 @@ export default defineConfig({
     },
   },
 });
-

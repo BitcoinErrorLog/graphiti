@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { Session, storage } from '../../utils/storage';
 import { logger } from '../../utils/logger';
 import { getTagStyle } from '../../utils/tag-colors';
+import SyncStatus from './SyncStatus';
+import { parseAndValidateTags, validatePostContent, VALIDATION_LIMITS } from '../../utils/validation';
+import LoadingSpinner from './LoadingSpinner';
+import { toastManager } from '../../utils/toast';
 
 interface MainViewProps {
   session: Session;
@@ -12,6 +16,7 @@ interface MainViewProps {
   onPost: (content: string, tags: string[]) => void;
   onOpenSidePanel: () => void;
   onEditProfile: () => void;
+  onManageStorage: () => void;
 }
 
 function MainView({
@@ -23,13 +28,17 @@ function MainView({
   onPost,
   onOpenSidePanel,
   onEditProfile,
+  onManageStorage,
 }: MainViewProps) {
   const [postContent, setPostContent] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [existingTags, setExistingTags] = useState<string[]>([]);
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
+  const [isBookmarking, setIsBookmarking] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
-  const MAX_CONTENT_LENGTH = 1000;
+  const MAX_CONTENT_LENGTH = VALIDATION_LIMITS.POST_CONTENT_MAX_LENGTH;
 
   useEffect(() => {
     loadExistingData();
@@ -37,6 +46,7 @@ function MainView({
 
   const loadExistingData = async () => {
     try {
+      setIsLoadingData(true);
       // Check if bookmarked
       const bookmarked = await storage.isBookmarked(currentUrl);
       setIsBookmarked(bookmarked);
@@ -48,42 +58,72 @@ function MainView({
       logger.debug('MainView', 'Loaded existing data', { bookmarked, tags });
     } catch (error) {
       logger.error('MainView', 'Failed to load existing data', error as Error);
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
-  const handlePostSubmit = (e: React.FormEvent) => {
+  const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isPosting) return; // Prevent double submission
     
     // Must have either content or tags
     if (!postContent.trim() && !tagInput.trim()) {
-      alert('Please enter post content or tags');
+      toastManager.warning('Please enter post content or tags');
       return;
     }
 
-    // Parse tags (comma or space separated)
-    const tags = tagInput
-      .split(/[,\s]+/)
-      .map(t => t.trim().toLowerCase())
-      .filter(t => t.length > 0 && t.length <= 20);
-
-    if (tagInput.trim() && tags.length === 0) {
-      alert('Please enter valid tags (max 20 characters each)');
+    // Validate post content using centralized validation
+    const contentValidation = validatePostContent(postContent, false);
+    if (!contentValidation.valid) {
+      toastManager.error(contentValidation.error || 'Invalid post content');
       return;
     }
 
-    onPost(postContent, tags);
-    setPostContent('');
-    setTagInput('');
-    
-    // Update existing tags
-    if (tags.length > 0) {
-      setExistingTags(prev => [...new Set([...prev, ...tags])]);
+    // Parse and validate tags using centralized validation
+    const tagValidation = parseAndValidateTags(tagInput);
+    if (!tagValidation.valid) {
+      toastManager.error(tagValidation.error || 'Invalid tags');
+      return;
+    }
+
+    const validatedTags = tagValidation.sanitizedTags || [];
+
+    if (tagInput.trim() && validatedTags.length === 0) {
+      toastManager.warning(`Please enter valid tags (letters, numbers, hyphens, underscores; max ${VALIDATION_LIMITS.TAG_MAX_LENGTH} characters each)`);
+      return;
+    }
+
+    try {
+      setIsPosting(true);
+      await onPost(contentValidation.sanitized || postContent, validatedTags);
+      setPostContent('');
+      setTagInput('');
+      
+      // Update existing tags
+      if (validatedTags.length > 0) {
+        setExistingTags(prev => [...new Set([...prev, ...validatedTags])]);
+      }
+    } catch (error) {
+      logger.error('MainView', 'Failed to create post', error as Error);
+    } finally {
+      setIsPosting(false);
     }
   };
 
   const handleBookmarkClick = async () => {
-    await onBookmark();
-    setIsBookmarked(!isBookmarked);
+    if (isBookmarking) return; // Prevent double click
+    
+    try {
+      setIsBookmarking(true);
+      await onBookmark();
+      setIsBookmarked(!isBookmarked);
+    } catch (error) {
+      logger.error('MainView', 'Failed to toggle bookmark', error as Error);
+    } finally {
+      setIsBookmarking(false);
+    }
   };
 
   const handleDrawingToggle = async () => {
@@ -92,13 +132,13 @@ function MainView({
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab.id) {
         logger.error('MainView', 'No active tab found');
-        alert('No active tab found');
+        toastManager.error('No active tab found');
         return;
       }
 
       // Check if this is a valid page for content scripts
       if (tab.url && (tab.url.startsWith('chrome://') || tab.url.startsWith('about:') || tab.url.startsWith('chrome-extension://'))) {
-        alert('Drawing mode is not available on this page. Try a regular website.');
+        toastManager.warning('Drawing mode is not available on this page. Try a regular website.');
         return;
       }
 
@@ -106,7 +146,7 @@ function MainView({
       chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_DRAWING_MODE' }, (response) => {
         if (chrome.runtime.lastError) {
           logger.error('MainView', 'Failed to toggle drawing mode', new Error(chrome.runtime.lastError.message));
-          alert('Please refresh the page first, then try activating drawing mode again.');
+          toastManager.warning('Please refresh the page first, then try activating drawing mode again.');
         } else {
           logger.info('MainView', 'Drawing mode toggled', { active: response?.active });
           // Close popup so user can see the drawing canvas
@@ -115,7 +155,7 @@ function MainView({
       });
     } catch (error) {
       logger.error('MainView', 'Failed to toggle drawing mode', error as Error);
-      alert('Failed to activate drawing mode. Try refreshing the page.');
+      toastManager.error('Failed to activate drawing mode. Try refreshing the page.');
     }
   };
 
@@ -143,19 +183,24 @@ function MainView({
           </div>
           <button
             onClick={onSignOut}
-            className="px-3 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded transition ml-2 flex-shrink-0"
+            className="px-3 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded transition ml-2 flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-red-500"
+            aria-label="Sign out of your account"
           >
             Sign Out
           </button>
         </div>
         <button
           onClick={onEditProfile}
-          className="w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-medium rounded-lg transition flex items-center justify-center"
+          className="w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-medium rounded-lg transition flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+          aria-label="Edit your profile"
         >
           <span className="mr-2">✏️</span>
           Edit Profile
         </button>
       </div>
+
+      {/* Sync Status */}
+      <SyncStatus />
 
       {/* Current Page */}
       <div className="bg-[#1F1F1F] border border-[#3F3F3F] rounded-lg p-3">
@@ -176,20 +221,33 @@ function MainView({
           {/* Bookmark */}
           <button
             onClick={handleBookmarkClick}
-            className={`w-full px-4 py-2 rounded-lg font-medium transition flex items-center justify-center text-sm ${
+            disabled={isBookmarking || isLoadingData}
+            className={`w-full px-4 py-2 rounded-lg font-medium transition flex items-center justify-center text-sm focus:outline-none focus:ring-2 ${
               isBookmarked
-                ? 'bg-yellow-900/30 text-yellow-400 hover:bg-yellow-900/50 border border-yellow-700/50'
-                : 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 border border-blue-700/50'
-            }`}
+                ? 'bg-yellow-900/30 text-yellow-400 hover:bg-yellow-900/50 border border-yellow-700/50 focus:ring-yellow-500'
+                : 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 border border-blue-700/50 focus:ring-blue-500'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+            aria-pressed={isBookmarked}
           >
-            <span className="mr-2">{isBookmarked ? '⭐' : '☆'}</span>
-            {isBookmarked ? 'Bookmarked' : 'Bookmark Page'}
+            {isBookmarking ? (
+              <>
+                <LoadingSpinner size="sm" className="mr-2" />
+                <span>Processing...</span>
+              </>
+            ) : (
+              <>
+                <span className="mr-2">{isBookmarked ? '⭐' : '☆'}</span>
+                {isBookmarked ? 'Bookmarked' : 'Bookmark Page'}
+              </>
+            )}
           </button>
 
           {/* Drawing Mode */}
           <button
             onClick={handleDrawingToggle}
-            className="w-full px-4 py-2 bg-pink-900/30 text-pink-400 hover:bg-pink-900/50 border border-pink-700/50 rounded-lg font-medium transition flex items-center justify-center text-sm"
+            className="w-full px-4 py-2 bg-pink-900/30 text-pink-400 hover:bg-pink-900/50 border border-pink-700/50 rounded-lg font-medium transition flex items-center justify-center text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+            aria-label="Toggle drawing mode on current page"
           >
             <span className="mr-2">🎨</span>
             Drawing Mode
@@ -198,10 +256,21 @@ function MainView({
           {/* View Feed */}
           <button
             onClick={onOpenSidePanel}
-            className="w-full px-4 py-2 bg-purple-900/30 text-purple-400 hover:bg-purple-900/50 border border-purple-700/50 rounded-lg font-medium transition flex items-center justify-center text-sm"
+            className="w-full px-4 py-2 bg-purple-900/30 text-purple-400 hover:bg-purple-900/50 border border-purple-700/50 rounded-lg font-medium transition flex items-center justify-center text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            aria-label="Open feed sidebar to view posts and annotations"
           >
             <span className="mr-2">📱</span>
             View Feed
+          </button>
+
+          {/* Manage Storage */}
+          <button
+            onClick={onManageStorage}
+            className="w-full px-4 py-2 bg-gray-900/30 text-gray-400 hover:bg-gray-900/50 border border-gray-700/50 rounded-lg font-medium transition flex items-center justify-center text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+            aria-label="Manage storage and view storage usage"
+          >
+            <span className="mr-2">💾</span>
+            Manage Storage
           </button>
         </div>
       </div>
@@ -243,9 +312,11 @@ function MainView({
               className="w-full px-3 py-2 bg-[#2A2A2A] border border-[#3F3F3F] rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               rows={4}
               maxLength={MAX_CONTENT_LENGTH}
+              aria-label="Post content"
+              aria-describedby="post-content-help"
             />
             <div className="flex justify-between items-center mt-1">
-              <p className="text-xs text-gray-500">
+              <p id="post-content-help" className="text-xs text-gray-500">
                 URL will be added automatically
               </p>
               <span className={`text-xs ${postContent.length > MAX_CONTENT_LENGTH * 0.9 ? 'text-yellow-500' : 'text-gray-500'}`}>
@@ -262,18 +333,28 @@ function MainView({
             placeholder="Tags (comma or space separated)"
             className="w-full px-3 py-2 bg-[#2A2A2A] border border-[#3F3F3F] rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             maxLength={100}
+            aria-label="Tags for this post"
+            aria-describedby="tags-help"
           />
           
           <button
             type="submit"
-            disabled={!postContent.trim() && !tagInput.trim()}
-            className="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            disabled={(!postContent.trim() && !tagInput.trim()) || isPosting}
+            className="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label={postContent.trim() ? 'Create post' : 'Tag URL'}
           >
-            {postContent.trim() ? 'Create Post' : 'Tag URL'}
+            {isPosting ? (
+              <>
+                <LoadingSpinner size="sm" className="mr-2" />
+                <span>Posting...</span>
+              </>
+            ) : (
+              <span>{postContent.trim() ? 'Create Post' : 'Tag URL'}</span>
+            )}
           </button>
         </form>
 
-        <p className="text-xs text-gray-500 mt-2">
+        <p id="tags-help" className="text-xs text-gray-500 mt-2">
           Posts are published to your Pubky homeserver and tagged for discovery.
         </p>
       </div>

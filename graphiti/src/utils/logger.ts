@@ -23,6 +23,8 @@
  * @module utils/logger
  */
 
+// Config import removed - using direct constants instead
+
 /**
  * Log severity levels.
  */

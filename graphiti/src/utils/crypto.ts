@@ -297,10 +297,23 @@ export async function generateUrlHashTag(url: string): Promise<string> {
     
     // Step 4: Encode as UTF-16 by treating pairs of bytes as 16-bit code points
     // Uses little-endian byte order: first byte is low bits, second is high bits
+    // Filter out problematic characters for better compatibility
     let hashTag = '';
     for (let i = 0; i < truncatedHash.length; i += 2) {
       // Combine two bytes into a 16-bit value (little-endian)
-      const codePoint = truncatedHash[i] | (truncatedHash[i + 1] << 8);
+      let codePoint = truncatedHash[i] | (truncatedHash[i + 1] << 8);
+      
+      // Filter out problematic code points:
+      // - Control characters (U+0000-U+001F, U+007F-U+009F)
+      // - Surrogate pairs (U+D800-U+DFFF) 
+      // - Private use area issues
+      if (codePoint < 0x20 || 
+          (codePoint >= 0x7F && codePoint <= 0x9F) || 
+          (codePoint >= 0xD800 && codePoint <= 0xDFFF)) {
+        // Map to safe Unicode range (Miscellaneous Symbols block)
+        // This preserves determinism while ensuring valid characters
+        codePoint = 0x2600 + (codePoint % 256);
+      }
       
       // Convert to character - produces various Unicode characters
       hashTag += String.fromCharCode(codePoint);

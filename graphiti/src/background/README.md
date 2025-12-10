@@ -67,17 +67,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 ```
 
-## Service Worker Limitations
+## Service Worker Limitations & Offscreen API
 
 **Important:** Service workers don't have access to `window` or DOM APIs.
 
-For operations requiring these (like Pubky SDK initialization), use:
-1. Graceful error handling
-2. Fallback to content script or popup context
-3. Two-phase sync (local first, network later)
+The Pubky SDK requires `window` for initialization, so we use the **Chrome Offscreen API** to run SDK operations:
+
+### Offscreen Document Architecture
+
+```
+┌──────────────────────┐     Messages     ┌──────────────────────┐
+│  Background Service  │ ◄──────────────► │  Offscreen Document  │
+│      Worker          │                  │   (has DOM access)   │
+│                      │                  │                      │
+│  - Message routing   │                  │  - Pubky SDK init    │
+│  - Storage ops       │                  │  - Annotation sync   │
+│  - Local saves       │                  │  - Drawing sync      │
+└──────────────────────┘                  └──────────────────────┘
+```
+
+### How It Works
+
+1. **Local save first** - Data is saved locally immediately for instant feedback
+2. **Offscreen sync** - Background creates offscreen document for SDK operations
+3. **Automatic retry** - Periodic alarm retries failed syncs
+
+### Related Files
+
+- `src/offscreen/offscreen.ts` - Offscreen document handler
+- `src/offscreen/offscreen.html` - Offscreen HTML shell
+- `src/utils/offscreen-bridge.ts` - Bridge for communicating with offscreen
+
+### Sync Status
+
+The popup displays sync status and allows manual sync:
+- `src/popup/components/SyncStatus.tsx` - Sync status component
 
 ## See Also
 
 - [Manifest](../../manifest.json) - Command definitions
 - [Content Script](../content/README.md) - Page-injected code
+- [Offscreen API Docs](https://developer.chrome.com/docs/extensions/reference/api/offscreen)
 

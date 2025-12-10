@@ -297,7 +297,7 @@ Access via the 🔧 button in popup.
 
 | Module | Purpose |
 |--------|---------|
-| `auth.ts` / `auth-sdk.ts` | Authentication |
+| `auth-sdk.ts` | Authentication via official Pubky SDK |
 | `crypto.ts` | Cryptographic functions, URL hashing |
 | `storage.ts` | Local storage wrapper |
 | `pubky-api-sdk.ts` | Homeserver operations |

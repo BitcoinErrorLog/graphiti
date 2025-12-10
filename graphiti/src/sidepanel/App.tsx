@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { authManagerSDK } from '../utils/auth-sdk';
-import { Session } from '../utils/storage';
 import { pubkyAPISDK } from '../utils/pubky-api-sdk';
 import { NexusPost } from '../utils/nexus-client';
 import { Annotation } from '../utils/annotations';
@@ -8,14 +6,17 @@ import { logger } from '../utils/logger';
 import PostCard from './components/PostCard';
 import EmptyState from './components/EmptyState';
 import AnnotationCard from './components/AnnotationCard';
+import LoadingState from './components/LoadingState';
+import { useSession } from '../contexts/SessionContext';
 
 function App() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { session, loading: sessionLoading, refreshSession } = useSession();
+  const [panelLoading, setPanelLoading] = useState(true);
   const [currentUrl, setCurrentUrl] = useState<string>('');
   const [posts, setPosts] = useState<NexusPost[]>([]);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [, setLoadingAnnotations] = useState(false); // Used in loadAnnotations callback
   const [activeTab, setActiveTab] = useState<'posts' | 'annotations'>('posts');
 
   useEffect(() => {
@@ -91,12 +92,11 @@ function App() {
     try {
       logger.info('SidePanel', 'Initializing side panel');
 
-      // Check authentication
-      const existingSession = await authManagerSDK.getSession();
-      setSession(existingSession);
+      const refreshedSession = await refreshSession();
 
       // Sync any pending annotations to Pubky (from when background couldn't do it)
-      if (existingSession) {
+      const activeSession = refreshedSession ?? session;
+      if (activeSession) {
         try {
           const { AnnotationSync } = await import('../utils/annotation-sync');
           await AnnotationSync.syncPendingAnnotations();
@@ -112,10 +112,10 @@ function App() {
         logger.debug('SidePanel', 'Current tab URL', { url: tab.url });
       }
 
-      setLoading(false);
+      setPanelLoading(false);
     } catch (error) {
       logger.error('SidePanel', 'Failed to initialize', error as Error);
-      setLoading(false);
+      setPanelLoading(false);
     }
   };
 
@@ -144,6 +144,7 @@ function App() {
 
   const loadAnnotations = async () => {
     try {
+      setLoadingAnnotations(true);
       logger.info('SidePanel', 'Loading annotations for URL', { url: currentUrl });
 
       // Request annotations from background script
@@ -157,11 +158,13 @@ function App() {
             setAnnotations(response.annotations);
             logger.info('SidePanel', 'Annotations loaded', { count: response.annotations.length });
           }
+          setLoadingAnnotations(false);
         }
       );
     } catch (error) {
       logger.error('SidePanel', 'Failed to load annotations', error as Error);
       setAnnotations([]);
+      setLoadingAnnotations(false);
     }
   };
 
@@ -171,28 +174,54 @@ function App() {
   };
 
   const handleAnnotationClick = (annotation: Annotation) => {
-    logger.info('SidePanel', 'Annotation clicked, highlighting on page', { id: annotation.id });
+    logger.info('SidePanel', 'Annotation clicked', { id: annotation.id, url: annotation.url });
     
-    // Send message to content script to highlight the annotation on the page
+    // Helper to safely send message with error handling
+    const sendHighlightMessage = (tabId: number) => {
+      chrome.tabs.sendMessage(tabId, {
+        type: 'HIGHLIGHT_ANNOTATION',
+        annotationId: annotation.id,
+      }).catch((error) => {
+        // Content script not loaded - this is expected on chrome:// pages or after extension reload
+        logger.warn('SidePanel', 'Could not send highlight message - refresh the page', { error: error.message });
+      });
+    };
+    
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: 'HIGHLIGHT_ANNOTATION',
-          annotationId: annotation.id,
+      const currentTab = tabs[0];
+      if (!currentTab?.id) return;
+
+      // Normalize URLs for comparison (remove hash and query params)
+      const normalizeUrl = (url: string | undefined) => url?.split('#')[0].split('?')[0];
+      const currentUrl = normalizeUrl(currentTab.url);
+      const annotationUrl = normalizeUrl(annotation.url);
+      
+      if (currentUrl === annotationUrl) {
+        // Already on the page, just highlight
+        sendHighlightMessage(currentTab.id);
+      } else if (annotation.url) {
+        // Navigate to the page first, then highlight after it loads
+        logger.info('SidePanel', 'Navigating to annotation page', { url: annotation.url });
+        const tabId = currentTab.id;
+        chrome.tabs.update(tabId, { url: annotation.url }, () => {
+          // Wait for page to load before highlighting
+          const listener = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+            if (updatedTabId === tabId && changeInfo.status === 'complete') {
+              chrome.tabs.onUpdated.removeListener(listener);
+              // Delay to ensure content script is ready
+              setTimeout(() => {
+                sendHighlightMessage(tabId);
+              }, 500);
+            }
+          };
+          chrome.tabs.onUpdated.addListener(listener);
         });
       }
     });
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#2B2B2B]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
+  if (sessionLoading || panelLoading) {
+    return <LoadingState message="Initializing..." />;
   }
 
   // Show sign-in banner if not authenticated (but still show posts below)

@@ -25,6 +25,14 @@ The following files have been moved here for historical reference:
 - **INSTALLATION_INSTRUCTIONS.md** - Original installation guide
 - **INSTALLATION.md** - Duplicate installation guide
 - **SUMMARY.md** - Development summary
+- **REVIEW_SUMMARY.md** - Comprehensive code review summary (January 2025)
+- **URL_HASH_TAG_SYSTEM.md** - URL hash tag system documentation (superseded by UTF16_HASH_ENCODING.md)
+- **CODE_REVIEW.md** - Historical code review (November 2025, superseded by REVIEW_SUMMARY.md)
+- **SDK_INTEGRATION.md** - Pubky SDK integration technical reference
+- **test.html** - Development test page for annotations
+- **generate-icons.html** - Icon generator tool
+- **create-icons.js** - Script to create SVG icons
+- **create-png-icons.js** - Script to create PNG icons
 
 ## Key Historical Fixes
 
@@ -54,5 +62,5 @@ The URL hash tag encoding evolved from Base64URL to UTF-16 encoding for creating
 
 ---
 
-*Last archived: November 2025*
+*Last archived: January 2025*
 

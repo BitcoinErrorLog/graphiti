@@ -442,7 +442,8 @@ export function generateProfileHTML(profile: ProfileData, publicKey: string, res
         }, 2000);
       }).catch(err => {
         console.error('Failed to copy:', err);
-        alert('Failed to copy public key');
+        // Show error in console since this runs in profile renderer page context
+        console.error('[Graphiti] Failed to copy public key');
       });
     }
   </script>

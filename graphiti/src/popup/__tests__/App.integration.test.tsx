@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 // Mock all dependencies
@@ -61,10 +61,15 @@ vi.mock('../../utils/drawing-sync', () => ({
 }));
 
 // Mock Chrome APIs
+const mockTabData = [{ id: 123, url: 'https://example.com', title: 'Example Site' }];
 const mockTabs = {
-  query: vi.fn().mockResolvedValue([
-    { url: 'https://example.com', title: 'Example Site' },
-  ]),
+  query: vi.fn((_options: unknown, callback?: (tabs: typeof mockTabData) => void) => {
+    // Support both callback and promise styles
+    if (callback) {
+      callback(mockTabData);
+    }
+    return Promise.resolve(mockTabData);
+  }),
   sendMessage: vi.fn(),
 };
 
@@ -80,10 +85,15 @@ const mockStorage = {
   },
 };
 
+const mockSidePanel = {
+  open: vi.fn(),
+};
+
 (globalThis as any).chrome = {
   tabs: mockTabs,
   runtime: mockRuntime,
   storage: mockStorage,
+  sidePanel: mockSidePanel,
 };
 
 // Mock alert
@@ -115,6 +125,17 @@ describe('Popup App Integration', () => {
     App = AppModule.default;
   });
 
+  const renderPopup = async () => {
+    const { SessionProvider } = await import('../../contexts/SessionContext');
+    await act(async () => {
+      render(
+        <SessionProvider>
+          <App />
+        </SessionProvider>
+      );
+    });
+  };
+
   afterEach(() => {
     globalThis.alert = originalAlert;
   });
@@ -125,7 +146,7 @@ describe('Popup App Integration', () => {
         () => new Promise(() => {}) // Never resolves
       );
 
-      render(<App />);
+      await renderPopup();
 
       expect(screen.getByText('Loading...')).toBeInTheDocument();
     });
@@ -137,7 +158,7 @@ describe('Popup App Integration', () => {
     });
 
     it('should show auth view when not logged in', async () => {
-      render(<App />);
+          await renderPopup();
 
       await waitFor(() => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
@@ -164,7 +185,7 @@ describe('Popup App Integration', () => {
     });
 
     it('should show main view when logged in', async () => {
-      render(<App />);
+          await renderPopup();
 
       await waitFor(() => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
@@ -175,7 +196,7 @@ describe('Popup App Integration', () => {
     });
 
     it('should show current URL', async () => {
-      render(<App />);
+          await renderPopup();
 
       await waitFor(() => {
         expect(screen.getByText(/example\.com/i)).toBeInTheDocument();
@@ -183,7 +204,7 @@ describe('Popup App Integration', () => {
     });
 
     it('should show debug button', async () => {
-      render(<App />);
+        await renderPopup();
 
       await waitFor(() => {
         expect(screen.getByText(/Debug/i)).toBeInTheDocument();
@@ -191,7 +212,7 @@ describe('Popup App Integration', () => {
     });
 
     it('should toggle debug panel', async () => {
-      render(<App />);
+          await renderPopup();
 
       await waitFor(() => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
@@ -228,7 +249,7 @@ describe('Popup App Integration', () => {
         postUri: 'pubky://test/posts/456',
       });
 
-      render(<App />);
+          await renderPopup();
 
       await waitFor(() => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
@@ -257,7 +278,7 @@ describe('Popup App Integration', () => {
       vi.mocked(pubkyAPISDK.deleteBookmark).mockResolvedValue(undefined);
       vi.mocked(storage.removeBookmark).mockResolvedValue(undefined);
 
-      render(<App />);
+          await renderPopup();
 
       await waitFor(() => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
@@ -294,7 +315,7 @@ describe('Popup App Integration', () => {
       vi.mocked(authManagerSDK.signOut).mockResolvedValue(undefined);
       vi.mocked(storage.getBookmark).mockResolvedValue(null);
 
-      render(<App />);
+          await renderPopup();
 
       await waitFor(() => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
@@ -327,7 +348,7 @@ describe('Popup App Integration', () => {
     });
 
     it('should navigate to profile editor', async () => {
-      render(<App />);
+          await renderPopup();
 
       await waitFor(() => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
@@ -360,21 +381,21 @@ describe('Popup App Integration', () => {
     });
 
     it('should send message to open side panel', async () => {
-      render(<App />);
+      await renderPopup();
 
       await waitFor(() => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
       });
 
-      // Find side panel button
+      // Find side panel button (View Feed button)
       const sidePanelButton = screen.queryByRole('button', { name: /feed|side/i });
       if (sidePanelButton) {
         fireEvent.click(sidePanelButton);
 
         await waitFor(() => {
-          expect(mockRuntime.sendMessage).toHaveBeenCalledWith({
-            type: 'OPEN_SIDE_PANEL',
-          });
+          // Now opens side panel directly instead of sending message
+          expect(mockTabs.query).toHaveBeenCalledWith({ active: true, currentWindow: true });
+          expect(mockSidePanel.open).toHaveBeenCalledWith({ tabId: 123 });
         });
       }
     });

@@ -27,6 +27,8 @@ Thank you for your interest in contributing to Graphiti! This document provides 
 
 ## Development Setup
 
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed setup instructions.
+
 ```bash
 # Install dependencies
 npm install
@@ -40,6 +42,16 @@ npm test
 # Development mode with watch
 npm run dev
 ```
+
+### Environment Configuration
+
+Copy `.env.example` to `.env` and customize as needed:
+
+```bash
+cp .env.example .env
+```
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for available environment variables.
 
 ### Loading the Extension
 

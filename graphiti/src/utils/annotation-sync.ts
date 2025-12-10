@@ -31,10 +31,9 @@ export class AnnotationSync {
                 annotation.selectedText,
                 annotation.comment,
                 {
-                  startPath: annotation.startPath,
-                  endPath: annotation.endPath,
-                  startOffset: annotation.startOffset,
-                  endOffset: annotation.endOffset,
+                  prefix: annotation.prefix || '',
+                  exact: annotation.exact || annotation.selectedText,
+                  suffix: annotation.suffix || '',
                 }
               );
 

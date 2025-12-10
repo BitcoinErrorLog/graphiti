@@ -30,15 +30,9 @@ Icons for the Graphiti Chrome extension.
 
 ## Generating Icons
 
-Icons can be regenerated from SVG using:
-
-```bash
-node create-png-icons.js
-```
-
-Or use the HTML generator:
-1. Open `generate-icons.html` in browser
-2. Right-click and save each canvas as PNG
+Icon generation tools are available in `docs/archive/`:
+- `create-png-icons.js` - Script to create PNG icons
+- `generate-icons.html` - HTML-based icon generator
 
 ## Design
 
@@ -51,5 +45,4 @@ The icon uses a gradient design with:
 ## See Also
 
 - [manifest.json](../manifest.json)
-- [create-png-icons.js](../create-png-icons.js)
 
