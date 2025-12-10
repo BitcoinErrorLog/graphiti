@@ -29,7 +29,6 @@ pnpm-debug.log*
 # Extension packaging artifacts
 *.crx
 *.pem
-*.zip
 
 # OS
 Thumbs.db
