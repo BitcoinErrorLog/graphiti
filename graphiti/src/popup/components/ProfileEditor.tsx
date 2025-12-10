@@ -3,6 +3,8 @@ import { storage, ProfileData } from '../../utils/storage';
 import { profileManager } from '../../utils/profile-manager';
 import { logger } from '../../utils/logger';
 import { validateProfile, VALIDATION_LIMITS } from '../../utils/validation';
+import ProgressBar from './ProgressBar';
+import ImageCropper from './ImageCropper';
 
 // Common emojis for the picker
 const COMMON_EMOJIS = [
@@ -29,6 +31,10 @@ export function ProfileEditor() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [showCropper, setShowCropper] = useState(false);
+  const [imageFileToCrop, setImageFileToCrop] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   
   // Form state - Now matches Pubky App standard profile.json
   const [name, setName] = useState('');
@@ -172,25 +178,68 @@ export function ProfileEditor() {
     setLinks(links.filter((_, i) => i !== index));
   };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const validateImageFile = (file: File): boolean => {
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      showMessage('error', 'Please select an image file');
+      return false;
+    }
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showMessage('error', 'Image must be smaller than 5MB');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleImageFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (!validateImageFile(file)) return;
+
+    // Show cropper for avatar images (square aspect ratio)
+    setImageFileToCrop(file);
+    setShowCropper(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    if (!validateImageFile(file)) return;
+
+    // Show cropper for avatar images (square aspect ratio)
+    setImageFileToCrop(file);
+    setShowCropper(true);
+  };
+
+  const handleCropComplete = async (croppedFile: File) => {
+    setShowCropper(false);
+    setImageFileToCrop(null);
+
     try {
       setUploading(true);
+      setUploadProgress(0);
       setMessage(null);
-
-      // Check file type
-      if (!file.type.startsWith('image/')) {
-        showMessage('error', 'Please select an image file');
-        return;
-      }
-
-      // Check file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        showMessage('error', 'Image must be smaller than 5MB');
-        return;
-      }
 
       const session = await storage.getSession();
       if (!session) {
@@ -198,15 +247,20 @@ export function ProfileEditor() {
         return;
       }
 
-      logger.info('ProfileEditor', 'Uploading image', { size: file.size, type: file.type });
+      logger.info('ProfileEditor', 'Uploading cropped image', { size: croppedFile.size, type: croppedFile.type });
 
-      // Use imageHandler to upload
+      // Use imageHandler to upload with progress callback
       const { imageHandler } = await import('../../utils/image-handler');
       const timestamp = Date.now();
-      const extension = file.name.split('.').pop() || 'jpg';
+      const extension = croppedFile.name.split('.').pop() || 'jpg';
       const filename = `avatar-${timestamp}.${extension}`;
       
-      const imagePath = await imageHandler.uploadImage(file, session.pubky, filename);
+      const imagePath = await imageHandler.uploadImage(
+        croppedFile, 
+        session.pubky, 
+        filename,
+        (progress) => setUploadProgress(progress)
+      );
 
       if (imagePath) {
         setImage(imagePath); // Set the path like /pub/pubky.app/files/avatar-123.jpg
@@ -220,6 +274,7 @@ export function ProfileEditor() {
       showMessage('error', 'Failed to upload image. Please try again.');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -311,25 +366,51 @@ export function ProfileEditor() {
             </div>
           )}
 
-          {/* Upload Button */}
-          <div className="flex gap-2">
-            <label className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center cursor-pointer hover:bg-gray-600 focus-within:ring-2 focus-within:ring-purple-500">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                disabled={uploading}
-                className="hidden"
-                aria-label="Upload avatar image"
+          {/* Upload Button with Drag and Drop */}
+          <div 
+            className={`space-y-2 border-2 border-dashed rounded-lg p-4 transition-colors ${
+              isDragging 
+                ? 'border-blue-500 bg-blue-500/10' 
+                : 'border-gray-600 bg-gray-800/50'
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <div className="flex gap-2">
+              <label className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center cursor-pointer hover:bg-gray-600 focus-within:ring-2 focus-within:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileSelect}
+                  disabled={uploading}
+                  className="hidden"
+                  aria-label="Upload avatar image"
+                />
+                {uploading ? 'Uploading...' : '📤 Upload Image'}
+              </label>
+            </div>
+            {uploading && (
+              <ProgressBar 
+                progress={uploadProgress} 
+                label="Uploading image"
+                className="mt-2"
               />
-              {uploading ? 'Uploading...' : '📤 Upload Image'}
-            </label>
-            
+            )}
+            {!uploading && (
+              <p className="text-xs text-gray-400 text-center">
+                {isDragging ? 'Drop image here' : 'Drag and drop an image here, or click to select'}
+              </p>
+            )}
+          </div>
+          
+          {/* URL Input */}
+          <div className="mt-2">
             <input
               type="text"
               value={image}
               onChange={(e) => setImage(e.target.value)}
-              className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
               placeholder="Or paste image URL"
               aria-label="Avatar image URL"
             />
@@ -458,6 +539,19 @@ export function ProfileEditor() {
           * Your profile will be saved as profile.json and a generated index.html on your homeserver
         </p>
       </div>
+      
+      {/* Image Cropper Modal */}
+      {showCropper && imageFileToCrop && (
+        <ImageCropper
+          imageFile={imageFileToCrop}
+          aspectRatio={1}
+          onCropComplete={handleCropComplete}
+          onCancel={() => {
+            setShowCropper(false);
+            setImageFileToCrop(null);
+          }}
+        />
+      )}
     </div>
   );
 }

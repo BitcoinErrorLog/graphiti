@@ -1,16 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { pubkyAPISDK } from '../utils/pubky-api-sdk';
 import { NexusPost } from '../utils/nexus-client';
 import { Annotation } from '../utils/annotations';
 import { logger } from '../utils/logger';
 import PostCard from './components/PostCard';
+import PostCardSkeleton from './components/PostCardSkeleton';
 import EmptyState from './components/EmptyState';
 import AnnotationCard from './components/AnnotationCard';
 import LoadingState from './components/LoadingState';
+import KeyboardShortcutsModal from '../popup/components/KeyboardShortcutsModal';
 import { useSession } from '../contexts/SessionContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 function App() {
   const { session, loading: sessionLoading, refreshSession } = useSession();
+  const { theme } = useTheme();
   const [panelLoading, setPanelLoading] = useState(true);
   const [currentUrl, setCurrentUrl] = useState<string>('');
   const [posts, setPosts] = useState<NexusPost[]>([]);
@@ -18,6 +22,12 @@ function App() {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [, setLoadingAnnotations] = useState(false); // Used in loadAnnotations callback
   const [activeTab, setActiveTab] = useState<'posts' | 'annotations'>('posts');
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [postsPage, setPostsPage] = useState(0);
+  const [postsCursor, setPostsCursor] = useState<string | undefined>(undefined);
+  const POSTS_PER_PAGE = 20;
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     initializePanel();
@@ -63,7 +73,12 @@ function App() {
   useEffect(() => {
     // Load posts and annotations if we have a URL
     if (currentUrl) {
-      loadPosts();
+      // Reset pagination when URL changes
+      setPostsPage(0);
+      setPostsCursor(undefined);
+      setHasMorePosts(true);
+      setPosts([]);
+      loadPosts(true);
       loadAnnotations();
     }
   }, [session, currentUrl]);
@@ -87,6 +102,22 @@ function App() {
       chrome.runtime.onMessage.removeListener(handleMessage);
     };
   }, []);
+
+  // Keyboard shortcut listener for Shift+?
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key === '?') {
+        e.preventDefault();
+        setShowShortcuts(true);
+      }
+      if (e.key === 'Escape' && showShortcuts) {
+        setShowShortcuts(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showShortcuts]);
 
   const initializePanel = async () => {
     try {
@@ -119,32 +150,109 @@ function App() {
     }
   };
 
-  const loadPosts = async () => {
+  const announceToScreenReader = (message: string, priority: 'polite' | 'assertive' = 'polite') => {
+    const region = document.getElementById('aria-live-region');
+    if (region) {
+      region.setAttribute('aria-live', priority);
+      region.textContent = message;
+      // Clear after announcement to allow re-announcement
+      setTimeout(() => {
+        region.textContent = '';
+      }, 1000);
+    }
+  };
+
+  const loadPosts = async (reset: boolean = false) => {
     try {
+      let currentPage = postsPage;
+      if (reset) {
+        setPostsPage(0);
+        setPostsCursor(undefined);
+        setHasMorePosts(true);
+        currentPage = 0;
+      }
+      
       setLoadingPosts(true);
+      if (reset) {
+        announceToScreenReader('Loading posts...');
+      }
+      
       logger.info('SidePanel', 'Loading posts for URL via Nexus', { 
         url: currentUrl, 
         signedIn: !!session,
+        page: currentPage,
         searchScope: 'ALL posts across network'
       });
 
       // Search for ALL posts containing this URL using Nexus API
       // Session is optional - we show all posts regardless of login status
-      const foundPosts = await pubkyAPISDK.searchPostsByUrl(currentUrl, session?.pubky);
-      setPosts(foundPosts || []);
+      const urlHashTag = await import('../utils/crypto').then(m => m.generateUrlHashTag(currentUrl));
+      const { nexusClient } = await import('../utils/nexus-client');
+      
+      const skip = currentPage * POSTS_PER_PAGE;
+      const response = await nexusClient.streamPosts({
+        tags: urlHashTag,
+        limit: POSTS_PER_PAGE,
+        skip: skip,
+        viewer_id: session?.pubky
+      });
 
-      logger.info('SidePanel', 'Posts loaded', { count: foundPosts?.length || 0 });
+      const newPosts = response.data || [];
+      
+      if (reset) {
+        setPosts(newPosts);
+        setPostsPage(1);
+      } else {
+        setPosts(prev => [...prev, ...newPosts]);
+        setPostsPage(prev => prev + 1);
+      }
+      
+      // Check if there are more posts
+      const hasMore = newPosts.length === POSTS_PER_PAGE;
+      setHasMorePosts(hasMore);
+      setPostsCursor(response.cursor);
+
+      const totalCount = reset ? newPosts.length : posts.length + newPosts.length;
+      if (reset) {
+        announceToScreenReader(`Loaded ${totalCount} ${totalCount === 1 ? 'post' : 'posts'}`);
+      }
+      logger.info('SidePanel', 'Posts loaded', { count: newPosts.length, total: totalCount, hasMore });
     } catch (error) {
       logger.error('SidePanel', 'Failed to load posts', error as Error);
-      setPosts([]);
+      if (reset) {
+        setPosts([]);
+        announceToScreenReader('Failed to load posts', 'assertive');
+      }
     } finally {
       setLoadingPosts(false);
     }
   };
 
+  // Intersection observer for infinite scroll
+  useEffect(() => {
+    if (activeTab !== 'posts' || !hasMorePosts || loadingPosts || !sentinelRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const lastEntry = entries[entries.length - 1];
+        if (lastEntry.isIntersecting) {
+          loadPosts(false);
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    observer.observe(sentinelRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [activeTab, hasMorePosts, loadingPosts, posts.length, currentUrl]);
+
   const loadAnnotations = async () => {
     try {
       setLoadingAnnotations(true);
+      announceToScreenReader('Loading annotations...');
       logger.info('SidePanel', 'Loading annotations for URL', { url: currentUrl });
 
       // Request annotations from background script
@@ -155,8 +263,10 @@ function App() {
         },
         (response) => {
           if (response?.annotations) {
+            const count = response.annotations.length;
             setAnnotations(response.annotations);
-            logger.info('SidePanel', 'Annotations loaded', { count: response.annotations.length });
+            announceToScreenReader(`Loaded ${count} ${count === 1 ? 'annotation' : 'annotations'}`);
+            logger.info('SidePanel', 'Annotations loaded', { count });
           }
           setLoadingAnnotations(false);
         }
@@ -164,6 +274,7 @@ function App() {
     } catch (error) {
       logger.error('SidePanel', 'Failed to load annotations', error as Error);
       setAnnotations([]);
+      announceToScreenReader('Failed to load annotations', 'assertive');
       setLoadingAnnotations(false);
     }
   };
@@ -249,8 +360,26 @@ function App() {
     </div>
   ) : null;
 
+  const bgClass = theme === 'light' ? 'bg-white' : 'bg-[#2B2B2B]';
+
   return (
-    <div className="min-h-screen bg-[#2B2B2B]">
+    <div className={`min-h-screen ${bgClass}`}>
+      {/* Skip Link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:font-semibold"
+      >
+        Skip to main content
+      </a>
+      
+      {/* ARIA Live Region for announcements */}
+      <div 
+        aria-live="polite" 
+        aria-atomic="true" 
+        className="sr-only"
+        id="aria-live-region"
+      />
+      
       {/* Sign In Banner (if not authenticated) */}
       {SignInBanner}
       
@@ -321,13 +450,14 @@ function App() {
       </header>
 
       {/* Content */}
-      <div className="p-4">
+      <main id="main-content" className="p-4 max-w-4xl mx-auto" tabIndex={-1}>
         {activeTab === 'posts' ? (
           // Posts Feed
           loadingPosts ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <p className="text-gray-400">Loading posts...</p>
+            <div className="space-y-3">
+              <PostCardSkeleton />
+              <PostCardSkeleton />
+              <PostCardSkeleton />
             </div>
           ) : !posts || posts.length === 0 ? (
             <EmptyState currentUrl={currentUrl} />
@@ -336,6 +466,13 @@ function App() {
               {posts.map((post) => (
                 <PostCard key={post.details?.id || post.id || Math.random().toString()} post={post} />
               ))}
+              {hasMorePosts && (
+                <div ref={sentinelRef} className="flex justify-center py-4">
+                  {loadingPosts && (
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                  )}
+                </div>
+              )}
             </div>
           )
         ) : (
@@ -373,7 +510,13 @@ function App() {
             </div>
           )
         )}
-      </div>
+      </main>
+      
+      {/* Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal 
+        isOpen={showShortcuts} 
+        onClose={() => setShowShortcuts(false)} 
+      />
     </div>
   );
 }

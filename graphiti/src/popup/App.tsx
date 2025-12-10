@@ -1,30 +1,53 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { storage, Session, StoredBookmark } from '../utils/storage';
 import { pubkyAPISDK } from '../utils/pubky-api-sdk';
 import { logger } from '../utils/logger';
 import { DrawingSync } from '../utils/drawing-sync';
 import AuthView from './components/AuthView';
 import MainView from './components/MainView';
-import DebugPanel from './components/DebugPanel';
-import { ProfileEditor } from './components/ProfileEditor';
-import StorageManager from './components/StorageManager';
 import ToastContainer from './components/Toast';
+import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
+import LoadingSpinner from './components/LoadingSpinner';
 import { useSession } from '../contexts/SessionContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { toastManager } from '../utils/toast';
+
+// Lazy load less-used components
+const DebugPanel = lazy(() => import('./components/DebugPanel'));
+const ProfileEditor = lazy(() => import('./components/ProfileEditor').then(module => ({ default: module.ProfileEditor })));
+const StorageManager = lazy(() => import('./components/StorageManager'));
 
 type View = 'main' | 'profile' | 'storage';
 
 function App() {
   const { session, loading: sessionLoading, setSession, signOut, refreshSession } = useSession();
+  const { theme, toggleTheme } = useTheme();
   const [uiLoading, setUiLoading] = useState(true);
   const [currentUrl, setCurrentUrl] = useState<string>('');
   const [currentTitle, setCurrentTitle] = useState<string>('');
   const [showDebug, setShowDebug] = useState(false);
   const [currentView, setCurrentView] = useState<View>('main');
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => {
     initializeApp();
   }, []);
+
+  // Keyboard shortcut listener for Shift+?
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key === '?') {
+        e.preventDefault();
+        setShowShortcuts(true);
+      }
+      if (e.key === 'Escape' && showShortcuts) {
+        setShowShortcuts(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showShortcuts]);
 
   const initializeApp = async () => {
     try {
@@ -69,11 +92,11 @@ function App() {
     }
   };
 
-  const handleBookmark = async () => {
+  const handleBookmark = async (category?: string) => {
     try {
       if (!session) return;
 
-      logger.info('App', 'Handling bookmark', { url: currentUrl });
+      logger.info('App', 'Handling bookmark', { url: currentUrl, category });
 
       // Check if already bookmarked
       const existingBookmark = await storage.getBookmark(currentUrl);
@@ -100,10 +123,11 @@ function App() {
           pubkyUrl: fullPath,
           bookmarkId,
           postUri,
+          category: category?.trim() || undefined,
         };
         await storage.saveBookmark(bookmark);
 
-        logger.info('App', 'Bookmark created successfully', { fullPath, bookmarkId, postUri });
+        logger.info('App', 'Bookmark created successfully', { fullPath, bookmarkId, postUri, category });
         toastManager.success('Bookmarked!');
       }
     } catch (error) {
@@ -171,52 +195,98 @@ function App() {
     );
   }
 
+  const themeClasses = theme === 'light' 
+    ? 'bg-white text-gray-900'
+    : 'bg-[#2B2B2B] text-white';
+
   return (
-    <div className="w-[400px] min-h-[500px] bg-[#2B2B2B]">
+    <div className={`w-[400px] min-h-[500px] ${themeClasses}`}>
+      {/* Skip Link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:font-semibold"
+      >
+        Skip to main content
+      </a>
+      
+      {/* ARIA Live Region for announcements */}
+      <div 
+        aria-live="polite" 
+        aria-atomic="true" 
+        className="sr-only"
+        id="aria-live-region"
+      />
+      
       {/* Header */}
-      <header className="bg-[#1F1F1F] border-b border-[#3F3F3F] p-4">
+      <header className={theme === 'light' ? 'bg-gray-50 border-b border-gray-200 p-4' : 'bg-[#1F1F1F] border-b border-[#3F3F3F] p-4'}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">Graphiti</h1>
-            <p className="text-xs text-gray-400">Pubky URL Tagger</p>
+            <h1 className={`text-xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Graphiti</h1>
+            <p className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>Pubky URL Tagger</p>
           </div>
-          <button
-            onClick={() => setShowDebug(!showDebug)}
-            className="px-3 py-1 text-xs bg-[#2A2A2A] hover:bg-[#333333] text-gray-300 rounded transition"
-            title="Toggle debug panel"
-          >
-            {showDebug ? '🔧 Hide' : '🔧 Debug'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className={`px-3 py-1 text-xs rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                theme === 'light' 
+                  ? 'bg-gray-200 hover:bg-gray-300 text-gray-700' 
+                  : 'bg-[#2A2A2A] hover:bg-[#333333] text-gray-300'
+              }`}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              className={`px-3 py-1 text-xs rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                theme === 'light' 
+                  ? 'bg-gray-200 hover:bg-gray-300 text-gray-700' 
+                  : 'bg-[#2A2A2A] hover:bg-[#333333] text-gray-300'
+              }`}
+              title="Toggle debug panel"
+            >
+              {showDebug ? '🔧 Hide' : '🔧 Debug'}
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Debug Panel */}
-      {showDebug && <DebugPanel />}
+      {showDebug && (
+        <Suspense fallback={<LoadingSpinner text="Loading debug panel..." />}>
+          <DebugPanel />
+        </Suspense>
+      )}
 
       {/* Main Content */}
-      <div className="p-4">
+      <main id="main-content" className="p-4" tabIndex={-1}>
         {!session ? (
           <AuthView onAuthSuccess={handleAuthSuccess} />
         ) : currentView === 'profile' ? (
-          <div>
-            <button
-              onClick={handleBackToMain}
-              className="mb-4 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
-            >
-              <span>←</span> Back
-            </button>
-            <ProfileEditor />
-          </div>
+          <Suspense fallback={<LoadingSpinner text="Loading profile editor..." />}>
+            <div>
+              <button
+                onClick={handleBackToMain}
+                className="mb-4 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
+              >
+                <span>←</span> Back
+              </button>
+              <ProfileEditor />
+            </div>
+          </Suspense>
         ) : currentView === 'storage' ? (
-          <div>
-            <button
-              onClick={handleBackToMain}
-              className="mb-4 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
-            >
-              <span>←</span> Back
-            </button>
-            <StorageManager />
-          </div>
+          <Suspense fallback={<LoadingSpinner text="Loading storage manager..." />}>
+            <div>
+              <button
+                onClick={handleBackToMain}
+                className="mb-4 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
+              >
+                <span>←</span> Back
+              </button>
+              <StorageManager />
+            </div>
+          </Suspense>
         ) : (
           <MainView
             session={session}
@@ -230,10 +300,16 @@ function App() {
             onManageStorage={handleManageStorage}
           />
         )}
-      </div>
+      </main>
       
       {/* Toast Container */}
       <ToastContainer />
+      
+      {/* Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal 
+        isOpen={showShortcuts} 
+        onClose={() => setShowShortcuts(false)} 
+      />
     </div>
   );
 }
