@@ -5,6 +5,7 @@ import { getTagStyle } from '../../utils/tag-colors';
 import SyncStatus from './SyncStatus';
 import { parseAndValidateTags, validatePostContent, VALIDATION_LIMITS } from '../../utils/validation';
 import LoadingSpinner from './LoadingSpinner';
+import SkeletonLoader from './SkeletonLoader';
 import { toastManager } from '../../utils/toast';
 
 interface MainViewProps {
@@ -12,7 +13,7 @@ interface MainViewProps {
   currentUrl: string;
   currentTitle: string;
   onSignOut: () => void;
-  onBookmark: () => void;
+  onBookmark: (category?: string) => void;
   onPost: (content: string, tags: string[]) => void;
   onOpenSidePanel: () => void;
   onEditProfile: () => void;
@@ -37,6 +38,8 @@ function MainView({
   const [isPosting, setIsPosting] = useState(false);
   const [isBookmarking, setIsBookmarking] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [showCategoryInput, setShowCategoryInput] = useState(false);
+  const [bookmarkCategory, setBookmarkCategory] = useState('');
 
   const MAX_CONTENT_LENGTH = VALIDATION_LIMITS.POST_CONTENT_MAX_LENGTH;
 
@@ -63,6 +66,18 @@ function MainView({
     }
   };
 
+  const announceToScreenReader = (message: string, priority: 'polite' | 'assertive' = 'polite') => {
+    const region = document.getElementById('aria-live-region');
+    if (region) {
+      region.setAttribute('aria-live', priority);
+      region.textContent = message;
+      // Clear after announcement to allow re-announcement
+      setTimeout(() => {
+        region.textContent = '';
+      }, 1000);
+    }
+  };
+
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -71,6 +86,7 @@ function MainView({
     // Must have either content or tags
     if (!postContent.trim() && !tagInput.trim()) {
       toastManager.warning('Please enter post content or tags');
+      announceToScreenReader('Please enter post content or tags', 'assertive');
       return;
     }
 
@@ -78,6 +94,7 @@ function MainView({
     const contentValidation = validatePostContent(postContent, false);
     if (!contentValidation.valid) {
       toastManager.error(contentValidation.error || 'Invalid post content');
+      announceToScreenReader(contentValidation.error || 'Invalid post content', 'assertive');
       return;
     }
 
@@ -85,6 +102,7 @@ function MainView({
     const tagValidation = parseAndValidateTags(tagInput);
     if (!tagValidation.valid) {
       toastManager.error(tagValidation.error || 'Invalid tags');
+      announceToScreenReader(tagValidation.error || 'Invalid tags', 'assertive');
       return;
     }
 
@@ -92,11 +110,13 @@ function MainView({
 
     if (tagInput.trim() && validatedTags.length === 0) {
       toastManager.warning(`Please enter valid tags (letters, numbers, hyphens, underscores; max ${VALIDATION_LIMITS.TAG_MAX_LENGTH} characters each)`);
+      announceToScreenReader('Please enter valid tags', 'assertive');
       return;
     }
 
     try {
       setIsPosting(true);
+      announceToScreenReader('Posting...');
       await onPost(contentValidation.sanitized || postContent, validatedTags);
       setPostContent('');
       setTagInput('');
@@ -105,8 +125,10 @@ function MainView({
       if (validatedTags.length > 0) {
         setExistingTags(prev => [...new Set([...prev, ...validatedTags])]);
       }
+      announceToScreenReader('Post created successfully');
     } catch (error) {
       logger.error('MainView', 'Failed to create post', error as Error);
+      announceToScreenReader('Failed to create post', 'assertive');
     } finally {
       setIsPosting(false);
     }
@@ -115,12 +137,42 @@ function MainView({
   const handleBookmarkClick = async () => {
     if (isBookmarking) return; // Prevent double click
     
+    // If not bookmarked, show category input
+    if (!isBookmarked) {
+      setShowCategoryInput(true);
+      return;
+    }
+    
+    // If already bookmarked, remove it
     try {
       setIsBookmarking(true);
+      announceToScreenReader('Processing bookmark...');
       await onBookmark();
-      setIsBookmarked(!isBookmarked);
+      setIsBookmarked(false);
+      setBookmarkCategory('');
+      announceToScreenReader('Bookmark removed');
     } catch (error) {
-      logger.error('MainView', 'Failed to toggle bookmark', error as Error);
+      logger.error('MainView', 'Failed to remove bookmark', error as Error);
+      announceToScreenReader('Failed to remove bookmark', 'assertive');
+    } finally {
+      setIsBookmarking(false);
+    }
+  };
+
+  const handleCategorySubmit = async () => {
+    if (isBookmarking) return;
+    
+    try {
+      setIsBookmarking(true);
+      setShowCategoryInput(false);
+      announceToScreenReader('Processing bookmark...');
+      await onBookmark(bookmarkCategory.trim() || undefined);
+      setIsBookmarked(true);
+      announceToScreenReader('Page bookmarked');
+    } catch (error) {
+      logger.error('MainView', 'Failed to create bookmark', error as Error);
+      announceToScreenReader('Failed to create bookmark', 'assertive');
+      setShowCategoryInput(true); // Show input again on error
     } finally {
       setIsBookmarking(false);
     }
@@ -219,34 +271,78 @@ function MainView({
         
         <div className="space-y-2">
           {/* Bookmark */}
-          <button
-            onClick={handleBookmarkClick}
-            disabled={isBookmarking || isLoadingData}
-            className={`w-full px-4 py-2 rounded-lg font-medium transition flex items-center justify-center text-sm focus:outline-none focus:ring-2 ${
-              isBookmarked
-                ? 'bg-yellow-900/30 text-yellow-400 hover:bg-yellow-900/50 border border-yellow-700/50 focus:ring-yellow-500'
-                : 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 border border-blue-700/50 focus:ring-blue-500'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-            aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
-            aria-pressed={isBookmarked}
-          >
-            {isBookmarking ? (
-              <>
-                <LoadingSpinner size="sm" className="mr-2" />
-                <span>Processing...</span>
-              </>
-            ) : (
-              <>
-                <span className="mr-2">{isBookmarked ? '⭐' : '☆'}</span>
-                {isBookmarked ? 'Bookmarked' : 'Bookmark Page'}
-              </>
-            )}
-          </button>
+          {showCategoryInput && !isBookmarked ? (
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={bookmarkCategory}
+                onChange={(e) => setBookmarkCategory(e.target.value)}
+                placeholder="Category (optional)"
+                className="w-full px-3 py-2 bg-[#2A2A2A] border border-[#3F3F3F] rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                maxLength={50}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleCategorySubmit();
+                  } else if (e.key === 'Escape') {
+                    setShowCategoryInput(false);
+                    setBookmarkCategory('');
+                  }
+                }}
+                autoFocus
+                aria-label="Bookmark category"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCategorySubmit}
+                  disabled={isBookmarking}
+                  className="flex-1 px-4 py-2 bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 border border-blue-700/50 rounded-lg font-medium transition-all duration-150 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Save bookmark"
+                >
+                  {isBookmarking ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCategoryInput(false);
+                    setBookmarkCategory('');
+                  }}
+                  disabled={isBookmarking}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-150 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500 active:scale-95 disabled:opacity-50"
+                  aria-label="Cancel"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={handleBookmarkClick}
+              disabled={isBookmarking || isLoadingData}
+              className={`w-full px-4 py-2 rounded-lg font-medium transition-all duration-150 flex items-center justify-center text-sm focus:outline-none focus:ring-2 active:scale-95 ${
+                isBookmarked
+                  ? 'bg-yellow-900/30 text-yellow-400 hover:bg-yellow-900/50 border border-yellow-700/50 focus:ring-yellow-500'
+                  : 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 border border-blue-700/50 focus:ring-blue-500'
+              } disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100`}
+              aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+              aria-pressed={isBookmarked}
+            >
+              {isBookmarking ? (
+                <>
+                  <LoadingSpinner size="sm" className="mr-2" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <span className="mr-2">{isBookmarked ? '⭐' : '☆'}</span>
+                  {isBookmarked ? 'Bookmarked' : 'Bookmark Page'}
+                </>
+              )}
+            </button>
+          )}
 
           {/* Drawing Mode */}
           <button
             onClick={handleDrawingToggle}
-            className="w-full px-4 py-2 bg-pink-900/30 text-pink-400 hover:bg-pink-900/50 border border-pink-700/50 rounded-lg font-medium transition flex items-center justify-center text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+            className="w-full px-4 py-2 bg-pink-900/30 text-pink-400 hover:bg-pink-900/50 border border-pink-700/50 rounded-lg font-medium transition-all duration-150 flex items-center justify-center text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 active:scale-95"
             aria-label="Toggle drawing mode on current page"
           >
             <span className="mr-2">🎨</span>
@@ -256,7 +352,7 @@ function MainView({
           {/* View Feed */}
           <button
             onClick={onOpenSidePanel}
-            className="w-full px-4 py-2 bg-purple-900/30 text-purple-400 hover:bg-purple-900/50 border border-purple-700/50 rounded-lg font-medium transition flex items-center justify-center text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full px-4 py-2 bg-purple-900/30 text-purple-400 hover:bg-purple-900/50 border border-purple-700/50 rounded-lg font-medium transition-all duration-150 flex items-center justify-center text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 active:scale-95"
             aria-label="Open feed sidebar to view posts and annotations"
           >
             <span className="mr-2">📱</span>
@@ -266,7 +362,7 @@ function MainView({
           {/* Manage Storage */}
           <button
             onClick={onManageStorage}
-            className="w-full px-4 py-2 bg-gray-900/30 text-gray-400 hover:bg-gray-900/50 border border-gray-700/50 rounded-lg font-medium transition flex items-center justify-center text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+            className="w-full px-4 py-2 bg-gray-900/30 text-gray-400 hover:bg-gray-900/50 border border-gray-700/50 rounded-lg font-medium transition-all duration-150 flex items-center justify-center text-sm focus:outline-none focus:ring-2 focus:ring-gray-500 active:scale-95"
             aria-label="Manage storage and view storage usage"
           >
             <span className="mr-2">💾</span>
@@ -340,7 +436,7 @@ function MainView({
           <button
             type="submit"
             disabled={(!postContent.trim() && !tagInput.trim()) || isPosting}
-            className="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-lg transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 active:scale-95"
             aria-label={postContent.trim() ? 'Create post' : 'Tag URL'}
           >
             {isPosting ? (
