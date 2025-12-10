@@ -58,9 +58,22 @@ export class AnnotationManager {
     this.init();
   }
 
-  private init() {
+  private annotationsEnabled: boolean = true;
+
+  private async init() {
     logger.info('ContentScript', 'Initializing annotation manager');
     this.injectStyles();
+    
+    // Load annotation enabled setting (default: true)
+    try {
+      const { storage } = await import('../utils/storage');
+      const enabled = await storage.getSetting<boolean>('annotationsEnabled', true);
+      this.annotationsEnabled = enabled ?? true;
+      logger.info('ContentScript', 'Annotation enabled setting loaded', { enabled: this.annotationsEnabled });
+    } catch (error) {
+      logger.warn('ContentScript', 'Failed to load annotation setting, defaulting to enabled', error as Error);
+      this.annotationsEnabled = true;
+    }
     
     // Bind handlers once for cleanup
     this.mouseUpHandler = this.handleTextSelection.bind(this);
@@ -68,6 +81,34 @@ export class AnnotationManager {
     
     document.addEventListener('mouseup', this.mouseUpHandler);
     chrome.runtime.onMessage.addListener(this.messageHandler);
+    
+    // Listen for toggle messages
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (message.type === 'TOGGLE_ANNOTATIONS') {
+        this.annotationsEnabled = message.enabled ?? !this.annotationsEnabled;
+        logger.info('ContentScript', 'Annotations toggled', { enabled: this.annotationsEnabled });
+        if (!this.annotationsEnabled) {
+          this.hideAnnotationButton();
+        }
+        sendResponse({ enabled: this.annotationsEnabled });
+        return true;
+      }
+      if (message.type === 'GET_ANNOTATIONS_ENABLED') {
+        sendResponse({ enabled: this.annotationsEnabled });
+        return true;
+      }
+      return false;
+    });
+    
+    // Listen for keyboard shortcut (Alt+Shift+A)
+    document.addEventListener('keydown', (e) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const altKey = isMac ? e.altKey : e.altKey;
+      if (altKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        this.toggleAnnotations();
+      }
+    });
     
     // Delay initial annotation load to allow dynamic content to load (SPAs)
     // This is especially important for sites like pubky.app that load content asynchronously
@@ -333,9 +374,26 @@ export class AnnotationManager {
   }
 
   private handleTextSelection(event: MouseEvent) {
+    // Don't process if annotations are disabled
+    if (!this.annotationsEnabled) {
+      return;
+    }
+
+    // Don't hide button if clicking on the annotation button itself
+    const target = event.target as HTMLElement;
+    if (target?.closest('.pubky-annotation-button') || target?.closest('.pubky-annotation-modal')) {
+      return;
+    }
+
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) {
-      this.hideAnnotationButton();
+      // Delay hiding to allow button click to register
+      setTimeout(() => {
+        const button = document.querySelector('.pubky-annotation-button');
+        if (button && !button.contains(document.activeElement)) {
+          this.hideAnnotationButton();
+        }
+      }, 100);
       return;
     }
 
@@ -366,9 +424,24 @@ export class AnnotationManager {
     `;
     button.style.left = `${x - 80}px`;
     button.style.top = `${y + 10}px`;
+    
+    // Use both mousedown and click to ensure the modal opens
+    // mousedown fires before mouseup, so it prevents the button from being hidden
     button.onmousedown = (e) => {
+      e.preventDefault();
       e.stopPropagation();
+      // Show modal immediately on mousedown to prevent button from being hidden
       this.showAnnotationModal();
+    };
+    
+    // Also handle click as backup
+    button.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // If modal isn't already showing, show it
+      if (!document.querySelector('.pubky-annotation-modal')) {
+        this.showAnnotationModal();
+      }
     };
 
     document.body.appendChild(button);
@@ -378,6 +451,32 @@ export class AnnotationManager {
     const existing = document.querySelector('.pubky-annotation-button');
     if (existing) {
       existing.remove();
+    }
+  }
+
+  private async toggleAnnotations() {
+    const newValue = !this.annotationsEnabled;
+    this.annotationsEnabled = newValue;
+    
+    try {
+      const { storage } = await import('../utils/storage');
+      await storage.saveSetting('annotationsEnabled', newValue);
+      logger.info('ContentScript', 'Annotations toggled via keyboard', { enabled: newValue });
+      
+      // Show visual feedback
+      chrome.runtime.sendMessage({
+        type: MESSAGE_TYPES.SHOW_TOAST,
+        toastType: newValue ? 'success' : 'info',
+        message: newValue ? 'Annotations enabled' : 'Annotations disabled',
+      }).catch(() => {
+        // Ignore if background script not available
+      });
+      
+      if (!newValue) {
+        this.hideAnnotationButton();
+      }
+    } catch (error) {
+      logger.error('ContentScript', 'Failed to toggle annotations', error as Error);
     }
   }
 
@@ -788,6 +887,24 @@ export class AnnotationManager {
           highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }
+      sendResponse({ success: true });
+    } else if (message.type === MESSAGE_TYPES.REMOVE_ANNOTATION) {
+      const annotationId = message.annotationId;
+      // Remove highlight from DOM
+      const highlight = document.querySelector(`[data-annotation-id="${annotationId}"]`);
+      if (highlight) {
+        // Unwrap the highlight span, restoring original text
+        const parent = highlight.parentNode;
+        if (parent) {
+          while (highlight.firstChild) {
+            parent.insertBefore(highlight.firstChild, highlight);
+          }
+          parent.removeChild(highlight);
+          logger.info('ContentScript', 'Annotation highlight removed from page', { id: annotationId });
+        }
+      }
+      // Remove from local annotations array
+      this.annotations = this.annotations.filter((a) => a.id !== annotationId);
       sendResponse({ success: true });
     }
     return true;
