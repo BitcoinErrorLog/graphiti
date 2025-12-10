@@ -9,6 +9,7 @@
     "build:analyze": "tsc && vite build && npm run analyze",
     "analyze": "npx vite-bundle-visualizer --open",
     "preview": "vite preview",
+    "package": "npm run build && cd dist && zip -r ../graphiti-extension.zip . -x '*.DS_Store' '*.map' && cd .. && echo '✓ Extension package created: graphiti-extension.zip'",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
