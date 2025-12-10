@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { pubkyAPISDK } from '../utils/pubky-api-sdk';
 import { NexusPost } from '../utils/nexus-client';
 import { Annotation } from '../utils/annotations';
 import { logger } from '../utils/logger';
@@ -25,6 +24,7 @@ function App() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const [postsPage, setPostsPage] = useState(0);
+  // @ts-ignore - postsCursor is set for future cursor-based pagination
   const [postsCursor, setPostsCursor] = useState<string | undefined>(undefined);
   const POSTS_PER_PAGE = 20;
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -284,6 +284,58 @@ function App() {
     loadAnnotations();
   };
 
+  const handleDeleteAnnotation = async (annotation: Annotation) => {
+    try {
+      logger.info('SidePanel', 'Deleting annotation', { id: annotation.id, url: annotation.url });
+      
+      // Delete from Pubky homeserver if it has a postUri
+      if (annotation.postUri && session?.pubky) {
+        try {
+          const { pubkyAPISDK } = await import('../utils/pubky-api-sdk');
+          await pubkyAPISDK.deleteAnnotationPost(annotation.postUri);
+          logger.info('SidePanel', 'Annotation post deleted from homeserver', { postUri: annotation.postUri });
+        } catch (deleteError) {
+          logger.warn('SidePanel', 'Failed to delete annotation from homeserver', deleteError as Error);
+          // Continue with local deletion even if remote deletion fails
+        }
+      }
+
+      // Delete from local storage
+      const { annotationStorage } = await import('../utils/annotations');
+      await annotationStorage.deleteAnnotation(annotation.url, annotation.id);
+      
+      // Notify content script to remove highlight from page
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const currentTab = tabs[0];
+        if (currentTab?.id && currentTab.url) {
+          // Normalize URLs for comparison
+          const normalizeUrl = (url: string | undefined) => url?.split('#')[0].split('?')[0];
+          const currentUrl = normalizeUrl(currentTab.url);
+          const annotationUrl = normalizeUrl(annotation.url);
+          
+          if (currentUrl === annotationUrl) {
+            chrome.tabs.sendMessage(currentTab.id, {
+              type: 'REMOVE_ANNOTATION',
+              annotationId: annotation.id,
+            }).catch((error) => {
+              // Content script might not be loaded - this is expected
+              logger.debug('SidePanel', 'Could not notify content script of deletion', { error: error.message });
+            });
+          }
+        }
+      });
+      
+      // Remove from local state
+      setAnnotations(prev => prev.filter(a => a.id !== annotation.id));
+      
+      announceToScreenReader('Annotation deleted');
+      logger.info('SidePanel', 'Annotation deleted successfully', { id: annotation.id });
+    } catch (error) {
+      logger.error('SidePanel', 'Failed to delete annotation', error as Error);
+      announceToScreenReader('Failed to delete annotation', 'assertive');
+    }
+  };
+
   const handleAnnotationClick = (annotation: Annotation) => {
     logger.info('SidePanel', 'Annotation clicked', { id: annotation.id, url: annotation.url });
     
@@ -505,6 +557,8 @@ function App() {
                   key={annotation.id} 
                   annotation={annotation}
                   onHighlight={handleAnnotationClick}
+                  onDelete={handleDeleteAnnotation}
+                  canDelete={session?.pubky === annotation.author}
                 />
               ))}
             </div>
