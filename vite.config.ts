@@ -40,8 +40,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
-    minify: 'esbuild', // Use esbuild for faster minification
-    target: 'es2020', // Target modern browsers
+    minify: 'esbuild',
+    target: 'es2020',
     rollupOptions: {
       input: {
         popup: resolve(__dirname, 'popup.html'),
@@ -49,15 +49,11 @@ export default defineConfig({
         'profile-renderer': resolve(__dirname, 'src/profile/profile-renderer.html'),
         offscreen: resolve(__dirname, 'src/offscreen/offscreen.html'),
         background: resolve(__dirname, 'src/background/background.ts'),
-        content: resolve(__dirname, 'src/content/content.ts'),
       },
       output: {
         entryFileNames: (chunkInfo) => {
           if (chunkInfo.name === 'background') {
             return 'background.js';
-          }
-          if (chunkInfo.name === 'content') {
-            return 'content.js';
           }
           if (chunkInfo.name === 'offscreen') {
             return 'src/offscreen/offscreen.js';
@@ -66,9 +62,8 @@ export default defineConfig({
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        format: 'es', // Default format for most files
+        format: 'es',
         manualChunks: (id) => {
-          // Vendor chunks for better caching
           if (id.includes('node_modules')) {
             if (id.includes('react') || id.includes('react-dom')) {
               return 'vendor-react';

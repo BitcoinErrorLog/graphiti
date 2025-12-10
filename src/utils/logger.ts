@@ -48,9 +48,16 @@ class Logger {
   private static instance: Logger;
   private logBuffer: LogEntry[] = [];
   private maxBufferSize = 1000;
+  private isStorageAvailable = false;
 
   private constructor() {
-    this.loadLogs();
+    // Check if chrome.storage is available (not in content scripts)
+    this.isStorageAvailable = typeof chrome !== 'undefined' && 
+                               typeof chrome.storage !== 'undefined' && 
+                               typeof chrome.storage.local !== 'undefined';
+    if (this.isStorageAvailable) {
+      this.loadLogs();
+    }
   }
 
   static getInstance(): Logger {
@@ -61,6 +68,7 @@ class Logger {
   }
 
   private async loadLogs() {
+    if (!this.isStorageAvailable) return;
     try {
       const result = await chrome.storage.local.get('debugLogs');
       if (result.debugLogs) {
@@ -72,6 +80,7 @@ class Logger {
   }
 
   private async saveLogs() {
+    if (!this.isStorageAvailable) return;
     try {
       await chrome.storage.local.set({ debugLogs: this.logBuffer });
     } catch (error) {
@@ -148,7 +157,9 @@ class Logger {
 
   async clearLogs() {
     this.logBuffer = [];
-    await chrome.storage.local.remove('debugLogs');
+    if (this.isStorageAvailable) {
+      await chrome.storage.local.remove('debugLogs');
+    }
     this.info('Logger', 'Logs cleared');
   }
 
