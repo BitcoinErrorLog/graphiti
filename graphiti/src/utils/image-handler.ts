@@ -99,11 +99,13 @@ export class ImageHandler {
    * @param imageData - Base64 data URL or Blob
    * @param pubkey - User's public key
    * @param filename - Optional filename (defaults to avatar.jpg)
+   * @param onProgress - Optional progress callback (0-100)
    */
   async uploadImage(
     imageData: string | Blob,
     pubkey: string,
-    filename: string = 'avatar.jpg'
+    filename: string = 'avatar.jpg',
+    onProgress?: (progress: number) => void
   ): Promise<string | null> {
     try {
       logger.info('ImageHandler', 'Uploading image to homeserver', { pubkey, filename });
@@ -115,22 +117,31 @@ export class ImageHandler {
       let blob: Blob;
       if (typeof imageData === 'string') {
         // Convert data URL to blob
+        onProgress?.(10);
         const response = await fetch(imageData);
         blob = await response.blob();
+        onProgress?.(30);
       } else {
         blob = imageData;
+        onProgress?.(20);
       }
 
+      // Simulate progress during upload (since fetch doesn't provide real progress)
+      onProgress?.(50);
+      
       const uploadResponse = await client.fetch(fullUrl, {
         method: 'PUT',
         body: blob,
         credentials: 'include',
       });
 
+      onProgress?.(90);
+
       if (!uploadResponse.ok) {
         throw new Error(`HTTP ${uploadResponse.status}: ${uploadResponse.statusText}`);
       }
 
+      onProgress?.(100);
       logger.info('ImageHandler', 'Image uploaded successfully', { path: imagePath });
       return imagePath; // Return the relative path for profile.json
     } catch (error) {

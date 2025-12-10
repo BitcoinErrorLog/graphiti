@@ -77,7 +77,7 @@ function PostCard({ post }: PostCardProps) {
   };
 
   return (
-    <div className="bg-[#1F1F1F] rounded-xl p-6 hover:bg-[#252525] transition-colors border border-[#2F2F2F]">
+    <div className="bg-[#1F1F1F] rounded-xl p-6 hover:bg-[#252525] transition-all duration-200 border border-[#2F2F2F] animate-fade-in">
       {/* Author Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3 min-w-0 flex-1">

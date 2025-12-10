@@ -13,12 +13,19 @@ export class DrawingManager {
   private currentThickness = DRAWING_CONSTANTS.DEFAULT_BRUSH_THICKNESS;
   private lastX = 0;
   private lastY = 0;
+  private isEraserMode = false;
+  
+  // History stack for undo/redo (max 50 states)
+  private historyStack: string[] = [];
+  private historyIndex = -1;
+  private readonly MAX_HISTORY = 50;
 
   // Bound event handlers to prevent memory leaks
   private boundStartDrawing: (e: MouseEvent) => void;
   private boundDraw: (e: MouseEvent) => void;
   private boundStopDrawing: () => void;
   private boundCleanup: () => void;
+  private boundKeyDown: (e: KeyboardEvent) => void;
 
 
   private readonly COLORS = DRAWING_CONSTANTS.DRAWING_COLORS;
@@ -31,6 +38,7 @@ export class DrawingManager {
     this.boundDraw = this.draw.bind(this);
     this.boundStopDrawing = this.stopDrawing.bind(this);
     this.boundCleanup = this.cleanup.bind(this);
+    this.boundKeyDown = this.handleKeyDown.bind(this);
     
     this.init();
   }
@@ -135,11 +143,18 @@ export class DrawingManager {
     this.ctx.strokeStyle = this.currentColor;
     this.ctx.lineWidth = this.currentThickness;
     this.ctx.lineCap = 'round';
+    this.ctx.globalCompositeOperation = 'source-over';
 
     this.canvas.addEventListener('mousedown', this.boundStartDrawing);
     this.canvas.addEventListener('mousemove', this.boundDraw);
     this.canvas.addEventListener('mouseup', this.boundStopDrawing);
     this.canvas.addEventListener('mouseleave', this.boundStopDrawing);
+    
+    // Add keyboard listener for undo/redo
+    window.addEventListener('keydown', this.boundKeyDown);
+    
+    // Save initial state
+    this.saveState();
 
     logger.info('DrawingManager', 'Canvas created');
   }
@@ -151,10 +166,17 @@ export class DrawingManager {
     this.canvas.removeEventListener('mousemove', this.boundDraw);
     this.canvas.removeEventListener('mouseup', this.boundStopDrawing);
     this.canvas.removeEventListener('mouseleave', this.boundStopDrawing);
+    
+    // Remove keyboard listener
+    window.removeEventListener('keydown', this.boundKeyDown);
 
     this.canvas.remove();
     this.canvas = null;
     this.ctx = null;
+    
+    // Clear history when canvas is removed
+    this.historyStack = [];
+    this.historyIndex = -1;
 
     logger.info('DrawingManager', 'Canvas removed');
   }
@@ -204,6 +226,41 @@ export class DrawingManager {
       <div style="margin-bottom: 16px;">
         <div style="font-size: 12px; margin-bottom: 8px; color: rgba(255, 255, 255, 0.8);">Thickness</div>
         <input type="range" id="${DRAWING_UI_CONSTANTS.THICKNESS_SLIDER_ID}" min="1" max="20" value="${this.currentThickness}" style="width: 100%;">
+      </div>
+      <div style="margin-bottom: 16px;">
+        <button id="toggle-eraser" style="
+          width: 100%;
+          padding: 10px;
+          background: ${this.isEraserMode ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.1)'};
+          border: 1px solid ${this.isEraserMode ? 'rgba(239, 68, 68, 0.5)' : 'rgba(255, 255, 255, 0.2)'};
+          border-radius: 12px;
+          color: white;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: ${this.isEraserMode ? '600' : '400'};
+        ">${this.isEraserMode ? '🖊️ Switch to Brush' : '🧹 Eraser'}</button>
+      </div>
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button id="undo-drawing" style="
+          flex: 1;
+          padding: 10px;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 12px;
+          color: white;
+          cursor: pointer;
+          font-size: 12px;
+        ">Undo</button>
+        <button id="redo-drawing" style="
+          flex: 1;
+          padding: 10px;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 12px;
+          color: white;
+          cursor: pointer;
+          font-size: 12px;
+        ">Redo</button>
       </div>
       <div style="display: flex; gap: 8px;">
         <button id="clear-drawing" style="
@@ -261,6 +318,35 @@ export class DrawingManager {
       closeButton.addEventListener('click', () => this.toggleDrawing());
     }
 
+    const toggleEraserButton = this.toolbar.querySelector('#toggle-eraser');
+    if (toggleEraserButton) {
+      toggleEraserButton.addEventListener('click', () => {
+        this.isEraserMode = !this.isEraserMode;
+        // Update button text and style
+        if (toggleEraserButton instanceof HTMLButtonElement) {
+          toggleEraserButton.textContent = this.isEraserMode ? '🖊️ Switch to Brush' : '🧹 Eraser';
+          toggleEraserButton.style.background = this.isEraserMode 
+            ? 'rgba(239, 68, 68, 0.3)' 
+            : 'rgba(255, 255, 255, 0.1)';
+          toggleEraserButton.style.borderColor = this.isEraserMode 
+            ? 'rgba(239, 68, 68, 0.5)' 
+            : 'rgba(255, 255, 255, 0.2)';
+          toggleEraserButton.style.fontWeight = this.isEraserMode ? '600' : '400';
+        }
+        logger.debug('DrawingManager', 'Eraser mode toggled', { isEraserMode: this.isEraserMode });
+      });
+    }
+
+    const undoButton = this.toolbar.querySelector('#undo-drawing');
+    if (undoButton) {
+      undoButton.addEventListener('click', () => this.undo());
+    }
+
+    const redoButton = this.toolbar.querySelector('#redo-drawing');
+    if (redoButton) {
+      redoButton.addEventListener('click', () => this.redo());
+    }
+
     const clearButton = this.toolbar.querySelector('#clear-drawing');
     if (clearButton) {
       clearButton.addEventListener('click', () => this.clearCanvas());
@@ -270,6 +356,9 @@ export class DrawingManager {
     if (saveButton) {
       saveButton.addEventListener('click', () => this.saveDrawing());
     }
+    
+    // Initialize undo/redo button states
+    this.updateUndoRedoButtons();
 
     logger.info('DrawingManager', 'Toolbar created');
   }
@@ -290,8 +379,16 @@ export class DrawingManager {
   private draw(event: MouseEvent) {
     if (!this.isDrawing || !this.ctx || !this.canvas) return;
 
-    this.ctx.strokeStyle = this.currentColor;
-    this.ctx.lineWidth = this.currentThickness;
+    if (this.isEraserMode) {
+      // Eraser mode: use destination-out to erase
+      this.ctx.globalCompositeOperation = 'destination-out';
+      this.ctx.lineWidth = this.currentThickness;
+    } else {
+      // Normal drawing mode
+      this.ctx.globalCompositeOperation = 'source-over';
+      this.ctx.strokeStyle = this.currentColor;
+      this.ctx.lineWidth = this.currentThickness;
+    }
 
     this.ctx.beginPath();
     this.ctx.moveTo(this.lastX, this.lastY);
@@ -302,7 +399,99 @@ export class DrawingManager {
   }
 
   private stopDrawing() {
-    this.isDrawing = false;
+    if (this.isDrawing) {
+      this.isDrawing = false;
+      // Save state after each stroke
+      this.saveState();
+    }
+  }
+  
+  private handleKeyDown(event: KeyboardEvent) {
+    if (!this.isActive) return;
+    
+    // Check for Ctrl+Z (undo) or Cmd+Z on Mac
+    if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+      event.preventDefault();
+      this.undo();
+      return;
+    }
+    
+    // Check for Ctrl+Y (redo) or Cmd+Shift+Z on Mac
+    if ((event.ctrlKey || event.metaKey) && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
+      event.preventDefault();
+      this.redo();
+      return;
+    }
+  }
+  
+  private saveState() {
+    if (!this.canvas || !this.ctx) return;
+    
+    // Convert canvas to base64
+    const state = this.canvas.toDataURL('image/png');
+    
+    // Remove any states after current index (when undoing and then drawing)
+    if (this.historyIndex < this.historyStack.length - 1) {
+      this.historyStack = this.historyStack.slice(0, this.historyIndex + 1);
+    }
+    
+    // Add new state
+    this.historyStack.push(state);
+    this.historyIndex = this.historyStack.length - 1;
+    
+    // Limit history size
+    if (this.historyStack.length > this.MAX_HISTORY) {
+      this.historyStack.shift();
+      this.historyIndex--;
+    }
+    
+    this.updateUndoRedoButtons();
+  }
+  
+  private undo() {
+    if (this.historyIndex <= 0 || !this.canvas || !this.ctx) return;
+    
+    this.historyIndex--;
+    this.restoreState(this.historyStack[this.historyIndex]);
+    this.updateUndoRedoButtons();
+    logger.debug('DrawingManager', 'Undo performed', { historyIndex: this.historyIndex });
+  }
+  
+  private redo() {
+    if (this.historyIndex >= this.historyStack.length - 1 || !this.canvas || !this.ctx) return;
+    
+    this.historyIndex++;
+    this.restoreState(this.historyStack[this.historyIndex]);
+    this.updateUndoRedoButtons();
+    logger.debug('DrawingManager', 'Redo performed', { historyIndex: this.historyIndex });
+  }
+  
+  private restoreState(stateData: string) {
+    if (!this.canvas || !this.ctx) return;
+    
+    const img = new Image();
+    img.onload = () => {
+      this.ctx!.clearRect(0, 0, this.canvas!.width, this.canvas!.height);
+      this.ctx!.drawImage(img, 0, 0);
+    };
+    img.src = stateData;
+  }
+  
+  private updateUndoRedoButtons() {
+    if (!this.toolbar) return;
+    
+    const undoButton = this.toolbar.querySelector('#undo-drawing') as HTMLButtonElement;
+    const redoButton = this.toolbar.querySelector('#redo-drawing') as HTMLButtonElement;
+    
+    if (undoButton) {
+      undoButton.disabled = this.historyIndex <= 0;
+      undoButton.style.opacity = this.historyIndex <= 0 ? '0.5' : '1';
+    }
+    
+    if (redoButton) {
+      redoButton.disabled = this.historyIndex >= this.historyStack.length - 1;
+      redoButton.style.opacity = this.historyIndex >= this.historyStack.length - 1 ? '0.5' : '1';
+    }
   }
 
   private setColor(color: string) {
@@ -318,6 +507,11 @@ export class DrawingManager {
   private clearCanvas() {
     if (!this.ctx || !this.canvas) return;
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    // Clear history and save empty state
+    this.historyStack = [];
+    this.historyIndex = -1;
+    this.saveState();
+    this.updateUndoRedoButtons();
     logger.info('DrawingManager', 'Canvas cleared');
   }
 

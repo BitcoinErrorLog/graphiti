@@ -56,6 +56,8 @@ export interface StoredBookmark {
   bookmarkId?: string;
   /** Post URI that the bookmark points to (the actual social content) */
   postUri?: string;
+  /** Category/folder for organizing bookmarks */
+  category?: string;
 }
 
 /**
@@ -224,6 +226,22 @@ class Storage {
       logger.error('Storage', 'Failed to remove bookmark', error as Error);
       throw error;
     }
+  }
+
+  async getBookmarksByCategory(category: string): Promise<StoredBookmark[]> {
+    const bookmarks = await this.getBookmarks();
+    return bookmarks.filter(b => b.category === category);
+  }
+
+  async getAllCategories(): Promise<string[]> {
+    const bookmarks = await this.getBookmarks();
+    const categories = new Set<string>();
+    bookmarks.forEach(b => {
+      if (b.category) {
+        categories.add(b.category);
+      }
+    });
+    return Array.from(categories).sort();
   }
 
   // Tags
@@ -448,6 +466,29 @@ class Storage {
     } catch (error) {
       logger.error('Storage', 'Failed to delete drawing', error as Error);
       throw error;
+    }
+  }
+
+  // Settings management
+  async saveSetting<T>(key: string, value: T): Promise<void> {
+    try {
+      const settings = await getStorageValue<Record<string, any>>(STORAGE_CONSTANTS.KEYS.SETTINGS, {});
+      settings[key] = value;
+      await setStorageValue(STORAGE_CONSTANTS.KEYS.SETTINGS, settings);
+      logger.debug('Storage', 'Setting saved', { key });
+    } catch (error) {
+      logger.error('Storage', 'Failed to save setting', error as Error);
+      throw error;
+    }
+  }
+
+  async getSetting<T>(key: string, defaultValue?: T): Promise<T | undefined> {
+    try {
+      const settings = await getStorageValue<Record<string, any>>(STORAGE_CONSTANTS.KEYS.SETTINGS, {});
+      return (settings[key] as T) ?? defaultValue;
+    } catch (error) {
+      logger.error('Storage', 'Failed to get setting', error as Error);
+      return defaultValue;
     }
   }
 }
