@@ -329,17 +329,7 @@ class Storage {
     }
   }
 
-  // Settings
-  async getSetting<T>(key: string, defaultValue: T): Promise<T> {
-    try {
-      const result = await chrome.storage.local.get(key);
-      return result[key] !== undefined ? result[key] : defaultValue;
-    } catch (error) {
-      logger.error('Storage', `Failed to get setting: ${key}`, error as Error);
-      return defaultValue;
-    }
-  }
-
+  // Settings (legacy methods - use saveSetting/getSetting below instead)
   async setSetting<T>(key: string, value: T): Promise<void> {
     try {
       await chrome.storage.local.set({ [key]: value });
@@ -473,6 +463,9 @@ class Storage {
   async saveSetting<T>(key: string, value: T): Promise<void> {
     try {
       const settings = await getStorageValue<Record<string, any>>(STORAGE_CONSTANTS.KEYS.SETTINGS, {});
+      if (!settings) {
+        throw new Error('Settings object is null');
+      }
       settings[key] = value;
       await setStorageValue(STORAGE_CONSTANTS.KEYS.SETTINGS, settings);
       logger.debug('Storage', 'Setting saved', { key });
@@ -485,6 +478,9 @@ class Storage {
   async getSetting<T>(key: string, defaultValue?: T): Promise<T | undefined> {
     try {
       const settings = await getStorageValue<Record<string, any>>(STORAGE_CONSTANTS.KEYS.SETTINGS, {});
+      if (!settings) {
+        return defaultValue;
+      }
       return (settings[key] as T) ?? defaultValue;
     } catch (error) {
       logger.error('Storage', 'Failed to get setting', error as Error);
