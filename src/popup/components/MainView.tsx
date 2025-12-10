@@ -5,7 +5,6 @@ import { getTagStyle } from '../../utils/tag-colors';
 import SyncStatus from './SyncStatus';
 import { parseAndValidateTags, validatePostContent, VALIDATION_LIMITS } from '../../utils/validation';
 import LoadingSpinner from './LoadingSpinner';
-import SkeletonLoader from './SkeletonLoader';
 import { toastManager } from '../../utils/toast';
 
 interface MainViewProps {
@@ -40,12 +39,51 @@ function MainView({
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [showCategoryInput, setShowCategoryInput] = useState(false);
   const [bookmarkCategory, setBookmarkCategory] = useState('');
+  const [annotationsEnabled, setAnnotationsEnabled] = useState(true);
 
   const MAX_CONTENT_LENGTH = VALIDATION_LIMITS.POST_CONTENT_MAX_LENGTH;
 
   useEffect(() => {
     loadExistingData();
+    loadAnnotationSetting();
   }, [currentUrl]);
+
+  const loadAnnotationSetting = async () => {
+    try {
+      const enabled = await storage.getSetting<boolean>('annotationsEnabled', true);
+      setAnnotationsEnabled(enabled ?? true);
+    } catch (error) {
+      logger.error('MainView', 'Failed to load annotation setting', error as Error);
+    }
+  };
+
+  const handleToggleAnnotations = async () => {
+    try {
+      const newValue = !annotationsEnabled;
+      await storage.saveSetting('annotationsEnabled', newValue);
+      setAnnotationsEnabled(newValue);
+      
+      // Notify all tabs to update their annotation state
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+          if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, {
+              type: 'TOGGLE_ANNOTATIONS',
+              enabled: newValue,
+            }).catch(() => {
+              // Ignore errors if content script not loaded
+            });
+          }
+        });
+      });
+      
+      toastManager.success(newValue ? 'Annotations enabled' : 'Annotations disabled');
+      announceToScreenReader(newValue ? 'Annotations enabled' : 'Annotations disabled');
+    } catch (error) {
+      logger.error('MainView', 'Failed to toggle annotations', error as Error);
+      toastManager.error('Failed to toggle annotations');
+    }
+  };
 
   const loadExistingData = async () => {
     try {
@@ -270,6 +308,30 @@ function MainView({
         <h3 className="text-sm font-semibold text-gray-400 mb-3">Quick Actions</h3>
         
         <div className="space-y-2">
+          {/* Annotations Toggle */}
+          <div className="flex items-center justify-between p-2 bg-[#2A2A2A] rounded-lg">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+              </svg>
+              <span className="text-sm text-white">Annotations</span>
+            </div>
+            <button
+              onClick={handleToggleAnnotations}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-[#1F1F1F] ${
+                annotationsEnabled ? 'bg-yellow-500' : 'bg-gray-600'
+              }`}
+              role="switch"
+              aria-checked={annotationsEnabled}
+              aria-label={annotationsEnabled ? 'Disable annotations' : 'Enable annotations'}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  annotationsEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
           {/* Bookmark */}
           {showCategoryInput && !isBookmarked ? (
             <div className="space-y-2">

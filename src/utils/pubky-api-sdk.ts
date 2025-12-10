@@ -696,6 +696,45 @@ class PubkyAPISDK {
   }
 
   /**
+   * Delete an annotation post from the homeserver
+   * @param postUri - The Pubky post URI (full path like pubky://... or just path)
+   */
+  async deleteAnnotationPost(postUri: string): Promise<void> {
+    try {
+      await this.getAuthenticatedSession(); // Ensure user is authenticated
+      logger.info('PubkyAPISDK', 'Deleting annotation post', { postUri });
+
+      // Extract path from postUri if it's a full pubky:// URI
+      let path = postUri;
+      if (postUri.startsWith('pubky://')) {
+        // Extract the path part after the pubky
+        const match = postUri.match(/^pubky:\/\/[^/]+(\/.+)$/);
+        if (match) {
+          path = match[1];
+        } else {
+          // If it's already a path, use it directly
+          path = postUri.replace(/^pubky:\/\/[^/]+/, '');
+        }
+      }
+
+      // Delete from homeserver using SDK
+      try {
+        await this.deleteFile(path);
+        logger.info('PubkyAPISDK', 'Annotation post deleted from homeserver', { 
+          path,
+          postUri
+        });
+      } catch (deleteError) {
+        logger.warn('PubkyAPISDK', 'Failed to delete annotation post from homeserver', deleteError as Error);
+        throw deleteError;
+      }
+    } catch (error) {
+      logger.error('PubkyAPISDK', 'Failed to delete annotation post', error as Error);
+      throw error;
+    }
+  }
+
+  /**
    * Search for annotation posts for a specific URL
    */
   async searchAnnotationsByUrl(url: string, viewerId?: string): Promise<NexusPost[]> {

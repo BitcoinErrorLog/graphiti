@@ -44,6 +44,11 @@ function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsModalProps
       category: 'Navigation'
     },
     {
+      keys: [`${modifierKey}+Shift+A`],
+      description: 'Toggle annotation button (enable/disable)',
+      category: 'Actions'
+    },
+    {
       keys: ['Shift+?'],
       description: 'Show keyboard shortcuts',
       category: 'Help'
