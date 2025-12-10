@@ -8,6 +8,9 @@
  */
 
 import { logger } from './logger';
+import ErrorHandler from './error-handler';
+import { TIMING_CONSTANTS } from './constants';
+import { toError } from './type-guards';
 
 /**
  * Configuration options for retry behavior.
@@ -28,10 +31,10 @@ export interface RetryOptions {
 }
 
 const DEFAULT_OPTIONS: Required<RetryOptions> = {
-  maxRetries: 3,
-  initialDelay: 1000,
+  maxRetries: TIMING_CONSTANTS.RETRY_MAX_ATTEMPTS,
+  initialDelay: TIMING_CONSTANTS.RETRY_INITIAL_DELAY,
   backoffMultiplier: 2,
-  maxDelay: 10000,
+  maxDelay: TIMING_CONSTANTS.RETRY_MAX_DELAY,
   shouldRetry: () => true,
   context: 'Retry',
 };
@@ -63,7 +66,7 @@ export async function withRetry<T>(
     try {
       return await fn();
     } catch (error) {
-      lastError = error as Error;
+      lastError = toError(error);
 
       // Check if we should retry
       if (attempt >= opts.maxRetries || !opts.shouldRetry(lastError)) {
@@ -84,7 +87,22 @@ export async function withRetry<T>(
     }
   }
 
-  logger.error(opts.context, `All ${opts.maxRetries + 1} attempts failed`, lastError!);
+  // Use error handler for final error
+  const errorInfo = ErrorHandler.handleAndReturn(lastError!, {
+    context: opts.context || 'Retry',
+    data: {
+      maxRetries: opts.maxRetries,
+      attempts: opts.maxRetries + 1,
+    },
+    showNotification: false, // Don't show notification, let caller decide
+  });
+
+  logger.error(opts.context || 'Retry', `All ${opts.maxRetries + 1} attempts failed`, lastError!);
+  
+  // Attach error info to error for caller (using interface augmentation)
+  if (lastError) {
+    (lastError as Error & { errorInfo?: typeof errorInfo }).errorInfo = errorInfo;
+  }
   throw lastError;
 }
 

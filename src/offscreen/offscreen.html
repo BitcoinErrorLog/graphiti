@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Graphiti Offscreen Document</title>
+</head>
+<body>
+  <!-- 
+    Offscreen document for Pubky SDK operations.
+    
+    The Pubky SDK requires access to `window` and DOM APIs that are not
+    available in Chrome Extension service workers. This offscreen document
+    provides that context and communicates with the background service worker
+    via message passing.
+    
+    This document is never visible to users.
+  -->
+  <script type="module" src="offscreen.js"></script>
+</body>
+</html>
+

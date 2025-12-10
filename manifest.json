@@ -9,7 +9,9 @@
     "tabs",
     "sidePanel",
     "webNavigation",
-    "notifications"
+    "notifications",
+    "alarms",
+    "offscreen"
   ],
   "host_permissions": [
     "http://*/*",

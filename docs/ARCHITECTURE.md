@@ -116,7 +116,7 @@ Shared modules:
 
 | Module | Responsibility |
 |--------|---------------|
-| `auth.ts` / `auth-sdk.ts` | Authentication flow |
+| `auth-sdk.ts` | Authentication via official Pubky SDK |
 | `crypto.ts` | Hashing, encoding, tokens |
 | `storage.ts` | Chrome storage wrapper |
 | `pubky-api-sdk.ts` | Homeserver operations |
@@ -127,15 +127,26 @@ Shared modules:
 
 ### Authentication Flow
 
+Authentication uses the official `@synonymdev/pubky` SDK for secure, decentralized identity.
+
+**Homeserver Resolution:**
+The homeserver URL is derived directly from the user's public key using the `pubky://` protocol:
+```
+homeserver = 'pubky://' + publicKey.z32()
+```
+This ensures proper routing through the Pubky DHT without hardcoded server URLs.
+
+**Auth Flow:**
 ```
 1. User clicks "Sign In"
-2. Popup generates client secret
-3. Popup creates pubkyauth:// URL with QR code
-4. User scans with Pubky Ring mobile app
-5. Mobile app sends encrypted token to relay
-6. Popup polls relay, receives token
-7. Popup decrypts token, extracts credentials
-8. Session stored in chrome.storage.local
+2. Popup creates auth request via Pubky SDK (authRequest)
+3. SDK generates pubkyauth:// URL with relay and capabilities
+4. QR code displayed for scanning
+5. User scans with Pubky Ring mobile app
+6. SDK awaits response via authRequest.response()
+7. On approval, SDK returns authenticated PublicKey
+8. Session created with homeserver = 'pubky://' + publicKey.z32()
+9. Session stored in chrome.storage.local
 ```
 
 ### Bookmark Flow

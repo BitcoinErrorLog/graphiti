@@ -12,10 +12,13 @@
  */
 
 import { logger } from './logger';
-import { withRetry, isRetryableNetworkError } from './retry';
+import { withRetry, isRetryableNetworkError, isRetryableHttpError } from './retry';
+import { withRateLimit, apiRateLimiters } from './rate-limiter';
+import { config } from '../config/config';
+import { measureAPICall } from './performance-monitor';
 
 /** Nexus API base URL */
-const NEXUS_API_URL = 'https://nexus.pubky.app';
+const NEXUS_API_URL = config.getValue('nexusApiUrl');
 
 /**
  * Post data from Nexus API.
@@ -115,8 +118,29 @@ export interface UsersStreamResponse {
  *   limit: 20
  * });
  */
+const shouldRetryNexusError = (error: Error): boolean => {
+  if (isRetryableNetworkError(error)) return true;
+  const httpMatch = /HTTP (\d+)/i.exec(error.message);
+  if (httpMatch) {
+    const status = Number(httpMatch[1]);
+    return isRetryableHttpError(status);
+  }
+  return false;
+};
+
 class NexusClient {
   private apiUrl: string;
+
+  private async withNexusGuards<T>(context: string, operation: () => Promise<T>): Promise<T> {
+    return withRetry(
+      () => withRateLimit(operation, apiRateLimiters.nexus),
+      {
+        maxRetries: 3,
+        context,
+        shouldRetry: shouldRetryNexusError,
+      }
+    );
+  }
 
   /**
    * Creates a new Nexus client.
@@ -138,8 +162,8 @@ class NexusClient {
 
     logger.debug('NexusClient', 'Fetching post', { authorId, postId, url });
 
-    return withRetry(
-      async () => {
+    return measureAPICall(`nexus:getPost:${authorId}/${postId}`, () =>
+      this.withNexusGuards('NexusClient.getPost', async () => {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         
@@ -147,12 +171,7 @@ class NexusClient {
         logger.info('NexusClient', 'Post fetched successfully', { postId });
         
         return data;
-      },
-      {
-        maxRetries: 3,
-        context: 'NexusClient.getPost',
-        shouldRetry: isRetryableNetworkError,
-      }
+      })
     );
   }
 
@@ -196,11 +215,14 @@ class NexusClient {
 
       logger.debug('NexusClient', 'Streaming posts', { options, url });
 
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const text = await measureAPICall(`nexus:streamPosts:${options.source || 'all'}`, () =>
+        this.withNexusGuards('NexusClient.streamPosts', async () => {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          return response.text();
+        })
+      );
       
-      // Handle empty responses
-      const text = await response.text();
       if (!text || text.trim() === '') {
         logger.info('NexusClient', 'Empty response from API', { options });
         return { data: [], cursor: undefined };
@@ -256,11 +278,14 @@ class NexusClient {
 
       logger.debug('NexusClient', 'Searching posts by tag', { tag, url });
 
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const text = await measureAPICall(`nexus:searchPostsByTag:${tag}`, () =>
+        this.withNexusGuards('NexusClient.searchPostsByTag', async () => {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          return response.text();
+        })
+      );
       
-      // Handle empty responses
-      const text = await response.text();
       if (!text || text.trim() === '') {
         logger.info('NexusClient', 'Empty response from API', { tag });
         return [];
@@ -297,8 +322,8 @@ class NexusClient {
 
     logger.debug('NexusClient', 'Fetching user', { userId, url });
 
-    return withRetry(
-      async () => {
+    return measureAPICall(`nexus:getUser:${userId}`, () =>
+      this.withNexusGuards('NexusClient.getUser', async () => {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         
@@ -306,12 +331,7 @@ class NexusClient {
         logger.info('NexusClient', 'User fetched successfully', { userId });
         
         return data;
-      },
-      {
-        maxRetries: 3,
-        context: 'NexusClient.getUser',
-        shouldRetry: isRetryableNetworkError,
-      }
+      })
     );
   }
 

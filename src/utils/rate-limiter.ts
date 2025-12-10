@@ -8,6 +8,7 @@
  */
 
 import { logger } from './logger';
+import { RATE_LIMIT_CONSTANTS } from './constants';
 
 /**
  * Configuration for rate limiter.
@@ -131,10 +132,18 @@ export class RateLimiter {
  */
 export const apiRateLimiters = {
   /** Nexus API: 30 requests per second */
-  nexus: new RateLimiter({ maxTokens: 30, refillRate: 30, context: 'NexusAPI' }),
+  nexus: new RateLimiter({ 
+    maxTokens: RATE_LIMIT_CONSTANTS.NEXUS.MAX_TOKENS, 
+    refillRate: RATE_LIMIT_CONSTANTS.NEXUS.REFILL_RATE, 
+    context: 'NexusAPI' 
+  }),
   
   /** Pubky homeserver: 10 requests per second */
-  pubky: new RateLimiter({ maxTokens: 10, refillRate: 10, context: 'PubkyAPI' }),
+  pubky: new RateLimiter({ 
+    maxTokens: RATE_LIMIT_CONSTANTS.PUBKY.MAX_TOKENS, 
+    refillRate: RATE_LIMIT_CONSTANTS.PUBKY.REFILL_RATE, 
+    context: 'PubkyAPI' 
+  }),
 };
 
 /**

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { authManagerSDK } from '../utils/auth-sdk';
 import { storage, Session, StoredBookmark } from '../utils/storage';
 import { pubkyAPISDK } from '../utils/pubky-api-sdk';
 import { logger } from '../utils/logger';
@@ -8,12 +7,16 @@ import AuthView from './components/AuthView';
 import MainView from './components/MainView';
 import DebugPanel from './components/DebugPanel';
 import { ProfileEditor } from './components/ProfileEditor';
+import StorageManager from './components/StorageManager';
+import ToastContainer from './components/Toast';
+import { useSession } from '../contexts/SessionContext';
+import { toastManager } from '../utils/toast';
 
-type View = 'main' | 'profile';
+type View = 'main' | 'profile' | 'storage';
 
 function App() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { session, loading: sessionLoading, setSession, signOut, refreshSession } = useSession();
+  const [uiLoading, setUiLoading] = useState(true);
   const [currentUrl, setCurrentUrl] = useState<string>('');
   const [currentTitle, setCurrentTitle] = useState<string>('');
   const [showDebug, setShowDebug] = useState(false);
@@ -27,9 +30,7 @@ function App() {
     try {
       logger.info('App', 'Initializing popup');
 
-      // Check authentication
-      const existingSession = await authManagerSDK.getSession();
-      setSession(existingSession);
+      const refreshedSession = await refreshSession();
 
       // Get current tab info
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -40,16 +41,17 @@ function App() {
       }
 
       // Sync pending drawings to Pubky (if authenticated)
-      if (existingSession) {
+      const sessionForSync = refreshedSession ?? session;
+      if (sessionForSync) {
         DrawingSync.syncPendingDrawings().catch((error) => {
           logger.warn('App', 'Failed to sync drawings in background', error);
         });
       }
 
-      setLoading(false);
+      setUiLoading(false);
     } catch (error) {
       logger.error('App', 'Failed to initialize', error as Error);
-      setLoading(false);
+      setUiLoading(false);
     }
   };
 
@@ -60,8 +62,7 @@ function App() {
 
   const handleSignOut = async () => {
     try {
-      await authManagerSDK.signOut();
-      setSession(null);
+      await signOut();
       logger.info('App', 'Signed out successfully');
     } catch (error) {
       logger.error('App', 'Failed to sign out', error as Error);
@@ -85,7 +86,7 @@ function App() {
         // Then remove from local storage
         await storage.removeBookmark(currentUrl);
         logger.info('App', 'Bookmark removed from homeserver and local storage');
-        alert('Bookmark removed!');
+        toastManager.success('Bookmark removed!');
       } else {
         // Create bookmark on homeserver using SDK
         // This creates a post first, then bookmarks it
@@ -103,11 +104,11 @@ function App() {
         await storage.saveBookmark(bookmark);
 
         logger.info('App', 'Bookmark created successfully', { fullPath, bookmarkId, postUri });
-        alert('Bookmarked!');
+        toastManager.success('Bookmarked!');
       }
     } catch (error) {
       logger.error('App', 'Failed to handle bookmark', error as Error);
-      alert('Failed to bookmark. Check debug logs for details.');
+      toastManager.error('Failed to bookmark. Check debug logs for details.');
     }
   };
 
@@ -130,27 +131,36 @@ function App() {
       await storage.saveTags(currentUrl, tags);
 
       logger.info('App', 'Post created successfully with content and tags', { postUrl, tags });
-      alert(content.trim() ? 'Posted!' : `Tagged with: ${tags.join(', ')}`);
+      toastManager.success(content.trim() ? 'Posted!' : `Tagged with: ${tags.join(', ')}`);
     } catch (error) {
       logger.error('App', 'Failed to create post', error as Error);
-      alert('Failed to create post. Check debug logs for details.');
+      toastManager.error('Failed to create post. Check debug logs for details.');
     }
   };
 
   const handleOpenSidePanel = () => {
-    chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL' });
-    logger.info('App', 'Opening side panel');
+    // Open side panel directly from popup (user gesture is preserved)
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.sidePanel.open({ tabId: tabs[0].id });
+        logger.info('App', 'Side panel opened');
+      }
+    });
   };
 
   const handleEditProfile = () => {
     setCurrentView('profile');
   };
 
+  const handleManageStorage = () => {
+    setCurrentView('storage');
+  };
+
   const handleBackToMain = () => {
     setCurrentView('main');
   };
 
-  if (loading) {
+  if (sessionLoading || uiLoading) {
     return (
       <div className="w-[400px] h-[500px] flex items-center justify-center bg-[#2B2B2B]">
         <div className="text-center">
@@ -197,6 +207,16 @@ function App() {
             </button>
             <ProfileEditor />
           </div>
+        ) : currentView === 'storage' ? (
+          <div>
+            <button
+              onClick={handleBackToMain}
+              className="mb-4 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
+            >
+              <span>←</span> Back
+            </button>
+            <StorageManager />
+          </div>
         ) : (
           <MainView
             session={session}
@@ -207,9 +227,13 @@ function App() {
             onPost={handlePost}
             onOpenSidePanel={handleOpenSidePanel}
             onEditProfile={handleEditProfile}
+            onManageStorage={handleManageStorage}
           />
         )}
       </div>
+      
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 }

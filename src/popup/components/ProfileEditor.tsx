@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { storage, ProfileData } from '../../utils/storage';
 import { profileManager } from '../../utils/profile-manager';
 import { logger } from '../../utils/logger';
+import { validateProfile, VALIDATION_LIMITS } from '../../utils/validation';
 
 // Common emojis for the picker
 const COMMON_EMOJIS = [
@@ -102,13 +103,7 @@ export function ProfileEditor() {
       setSaving(true);
       setMessage(null);
 
-      // Validate
-      if (!name.trim()) {
-        showMessage('error', 'Name is required');
-        return;
-      }
-
-      // Get session
+      // Get session first
       const session = await storage.getSession();
       if (!session) {
         showMessage('error', 'Not authenticated. Please sign in first.');
@@ -117,6 +112,20 @@ export function ProfileEditor() {
 
       // Filter out empty links
       const validLinks = links.filter(link => link.title.trim() && link.url.trim());
+
+      // Use centralized validation
+      const profileValidation = validateProfile({
+        name: name.trim(),
+        bio: bio.trim() || undefined,
+        status: status.trim() || undefined,
+        image: image.trim() || undefined,
+        links: validLinks.length > 0 ? validLinks : undefined,
+      });
+
+      if (!profileValidation.valid) {
+        showMessage('error', profileValidation.error || 'Invalid profile data');
+        return;
+      }
 
       // Create profile data using Pubky App standard format
       const profileData: ProfileData = {
@@ -146,6 +155,10 @@ export function ProfileEditor() {
   };
 
   const addLink = () => {
+    if (links.length >= VALIDATION_LIMITS.PROFILE_LINKS_MAX_COUNT) {
+      showMessage('error', `Maximum ${VALIDATION_LIMITS.PROFILE_LINKS_MAX_COUNT} links allowed`);
+      return;
+    }
     setLinks([...links, { title: '', url: '' }]);
   };
 
@@ -237,29 +250,36 @@ export function ProfileEditor() {
       <div className="space-y-4">
         {/* Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            Name *
+          <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="profile-name">
+            Name * <span className="text-xs text-gray-500">({name.length}/{VALIDATION_LIMITS.PROFILE_NAME_MAX_LENGTH})</span>
           </label>
           <input
+            id="profile-name"
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => setName(e.target.value.slice(0, VALIDATION_LIMITS.PROFILE_NAME_MAX_LENGTH))}
+            maxLength={VALIDATION_LIMITS.PROFILE_NAME_MAX_LENGTH}
             className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
             placeholder="Your display name"
+            aria-label="Display name"
+            aria-required="true"
+            aria-describedby="name-help"
           />
         </div>
 
         {/* Bio */}
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1">
-            Bio
+            Bio <span className="text-xs text-gray-500">({bio.length}/{VALIDATION_LIMITS.PROFILE_BIO_MAX_LENGTH})</span>
           </label>
           <textarea
             value={bio}
-            onChange={(e) => setBio(e.target.value)}
+            onChange={(e) => setBio(e.target.value.slice(0, VALIDATION_LIMITS.PROFILE_BIO_MAX_LENGTH))}
+            maxLength={VALIDATION_LIMITS.PROFILE_BIO_MAX_LENGTH}
             rows={3}
             className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
             placeholder="Tell us about yourself..."
+            aria-label="Bio"
           />
         </div>
 
@@ -283,7 +303,8 @@ export function ProfileEditor() {
               <button
                 type="button"
                 onClick={() => setImage('')}
-                className="text-sm text-red-400 hover:text-red-300"
+                className="text-sm text-red-400 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-500 rounded"
+                aria-label="Remove avatar image"
               >
                 Remove
               </button>
@@ -299,6 +320,7 @@ export function ProfileEditor() {
                 onChange={handleImageUpload}
                 disabled={uploading}
                 className="hidden"
+                aria-label="Upload avatar image"
               />
               {uploading ? 'Uploading...' : '📤 Upload Image'}
             </label>
@@ -309,6 +331,7 @@ export function ProfileEditor() {
               onChange={(e) => setImage(e.target.value)}
               className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
               placeholder="Or paste image URL"
+              aria-label="Avatar image URL"
             />
           </div>
           <p className="mt-1 text-xs text-gray-400">
@@ -319,7 +342,7 @@ export function ProfileEditor() {
         {/* Status with Emoji Picker */}
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1">
-            Status
+            Status <span className="text-xs text-gray-500">({status.length}/{VALIDATION_LIMITS.PROFILE_STATUS_MAX_LENGTH})</span>
           </label>
           <div className="flex gap-2">
             <div className="relative">
@@ -328,6 +351,9 @@ export function ProfileEditor() {
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 className="w-12 h-10 bg-gray-700 border border-gray-600 rounded-lg text-2xl hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer flex items-center justify-center"
                 title="Pick emoji"
+                aria-label="Open emoji picker"
+                aria-expanded={showEmojiPicker}
+                aria-haspopup="true"
               >
                 {status && /^[\u{1F300}-\u{1F9FF}]/u.test(status) ? status.charAt(0) : '😊'}
               </button>
@@ -341,7 +367,8 @@ export function ProfileEditor() {
                         onClick={() => {
                           // Prepend emoji to status text or replace existing emoji
                           const textWithoutEmoji = status.replace(/^[\u{1F300}-\u{1F9FF}\s]+/u, '').trim();
-                          setStatus(`${emoji} ${textWithoutEmoji}`);
+                          const newStatus = `${emoji} ${textWithoutEmoji}`.slice(0, VALIDATION_LIMITS.PROFILE_STATUS_MAX_LENGTH);
+                          setStatus(newStatus);
                           setShowEmojiPicker(false);
                         }}
                         className="text-2xl hover:bg-gray-700 rounded p-1 transition-colors"
@@ -356,9 +383,11 @@ export function ProfileEditor() {
             <input
               type="text"
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => setStatus(e.target.value.slice(0, VALIDATION_LIMITS.PROFILE_STATUS_MAX_LENGTH))}
+              maxLength={VALIDATION_LIMITS.PROFILE_STATUS_MAX_LENGTH}
               className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="👋 What's your status? (e.g., 🚀 Building cool stuff)"
+              aria-label="Status"
             />
           </div>
           <p className="mt-1 text-xs text-gray-400">
@@ -374,32 +403,39 @@ export function ProfileEditor() {
             </label>
             <button
               onClick={addLink}
-              className="text-sm text-purple-400 hover:text-purple-300"
+              className="text-sm text-purple-400 hover:text-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded"
+              aria-label="Add social link"
             >
               + Add Link
             </button>
           </div>
 
           <div className="space-y-2">
+            {links.length >= VALIDATION_LIMITS.PROFILE_LINKS_MAX_COUNT && (
+              <p className="text-xs text-yellow-500">Maximum {VALIDATION_LIMITS.PROFILE_LINKS_MAX_COUNT} links allowed</p>
+            )}
             {links.map((link, index) => (
               <div key={index} className="flex gap-2">
                 <input
                   type="text"
                   value={link.title}
-                  onChange={(e) => updateLink(index, 'title', e.target.value)}
+                  onChange={(e) => updateLink(index, 'title', e.target.value.slice(0, VALIDATION_LIMITS.PROFILE_LINK_TITLE_MAX_LENGTH))}
+                  maxLength={VALIDATION_LIMITS.PROFILE_LINK_TITLE_MAX_LENGTH}
                   className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="Link title"
                 />
                 <input
                   type="url"
                   value={link.url}
-                  onChange={(e) => updateLink(index, 'url', e.target.value)}
+                  onChange={(e) => updateLink(index, 'url', e.target.value.slice(0, VALIDATION_LIMITS.PROFILE_LINK_URL_MAX_LENGTH))}
+                  maxLength={VALIDATION_LIMITS.PROFILE_LINK_URL_MAX_LENGTH}
                   className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="https://..."
                 />
                 <button
                   onClick={() => removeLink(index)}
-                  className="px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
+                  className="px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  aria-label={`Remove link ${index + 1}`}
                 >
                   ✕
                 </button>
@@ -412,7 +448,8 @@ export function ProfileEditor() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-medium rounded-lg transition"
+          className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-medium rounded-lg transition focus:outline-none focus:ring-2 focus:ring-purple-500"
+          aria-label="Save profile"
         >
           {saving ? 'Saving...' : 'Save Profile'}
         </button>

@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 // Mock all dependencies
@@ -173,13 +173,24 @@ describe('Sidepanel App Integration', () => {
     App = AppModule.default;
   });
 
+  const renderSidepanel = async () => {
+    const { SessionProvider } = await import('../../contexts/SessionContext');
+    await act(async () => {
+      render(
+        <SessionProvider>
+          <App />
+        </SessionProvider>
+      );
+    });
+  };
+
   describe('Initial Load', () => {
     it('should show loading state initially', async () => {
       vi.mocked(pubkyAPISDK.searchPostsByUrl).mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
-      render(<App />);
+      await renderSidepanel();
 
       // Should show loading indicator
       expect(screen.getByText(/loading/i) || screen.queryByRole('progressbar')).toBeTruthy();
@@ -188,7 +199,7 @@ describe('Sidepanel App Integration', () => {
 
   describe('Authenticated User', () => {
     it('should fetch posts for current URL', async () => {
-      render(<App />);
+      await renderSidepanel();
 
       await waitFor(() => {
         expect(pubkyAPISDK.searchPostsByUrl).toHaveBeenCalledWith(
@@ -199,7 +210,7 @@ describe('Sidepanel App Integration', () => {
     });
 
     it('should display posts from network', async () => {
-      render(<App />);
+      await renderSidepanel();
 
       await waitFor(() => {
         // Should show post content or author names
@@ -225,7 +236,7 @@ describe('Sidepanel App Integration', () => {
     });
 
     it('should show sign in prompt when not authenticated', async () => {
-      render(<App />);
+      await renderSidepanel();
 
       await waitFor(() => {
         // Sidepanel shows a "Not Signed In" banner when unauthenticated
@@ -244,7 +255,7 @@ describe('Sidepanel App Integration', () => {
     });
 
     it('should show empty state when no posts found', async () => {
-      render(<App />);
+      await renderSidepanel();
 
       await waitFor(() => {
         const emptyState = screen.queryByText(/no posts/i) ||
@@ -258,7 +269,7 @@ describe('Sidepanel App Integration', () => {
 
   describe('Refresh', () => {
     it('should refetch posts when refresh is triggered', async () => {
-      render(<App />);
+      await renderSidepanel();
 
       await waitFor(() => {
         expect(pubkyAPISDK.searchPostsByUrl).toHaveBeenCalledTimes(1);
@@ -281,7 +292,7 @@ describe('Sidepanel App Integration', () => {
 
   describe('Post Cards', () => {
     it('should display author information', async () => {
-      render(<App />);
+      await renderSidepanel();
 
       await waitFor(() => {
         // Look for author name in rendered posts
@@ -292,7 +303,7 @@ describe('Sidepanel App Integration', () => {
     });
 
     it('should display post content', async () => {
-      render(<App />);
+      await renderSidepanel();
 
       await waitFor(() => {
         const contentElement = screen.queryByText(/test post/i) ||
@@ -302,7 +313,7 @@ describe('Sidepanel App Integration', () => {
     });
 
     it('should display relative timestamps', async () => {
-      render(<App />);
+      await renderSidepanel();
 
       await waitFor(() => {
         // Look for time-related text - formatDate returns "Now", "5M", "2H", "3D"
@@ -321,7 +332,7 @@ describe('Sidepanel App Integration', () => {
         new Error('Network error')
       );
 
-      render(<App />);
+      await renderSidepanel();
 
       await waitFor(() => {
         // Should not crash - either show error message or empty state
@@ -336,10 +347,11 @@ describe('Sidepanel App Integration', () => {
 
   describe('URL Display', () => {
     it('should show current page URL', async () => {
-      render(<App />);
+      await renderSidepanel();
 
       await waitFor(() => {
-        expect(screen.queryByText(/example\.com/i)).toBeTruthy();
+        const urls = screen.getAllByText(/example\.com/i);
+        expect(urls.length).toBeGreaterThan(0);
       });
     });
   });

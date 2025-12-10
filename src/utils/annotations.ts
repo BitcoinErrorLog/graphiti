@@ -9,10 +9,15 @@ export interface Annotation {
   url: string;
   selectedText: string;
   comment: string;
-  startPath: string;
-  endPath: string;
-  startOffset: number;
-  endOffset: number;
+  // Text-quote anchoring (new format)
+  prefix?: string;
+  exact?: string;
+  suffix?: string;
+  // Legacy path-based anchoring (deprecated, for migration)
+  startPath?: string;
+  endPath?: string;
+  startOffset?: number;
+  endOffset?: number;
   timestamp: number;
   author: string;
   postUri?: string;
@@ -25,6 +30,7 @@ export interface StoredAnnotations {
 
 class AnnotationStorage {
   private static readonly STORAGE_KEY = 'pubky_annotations';
+  private saveLock: Promise<void> = Promise.resolve();
 
   /**
    * Get all annotations for a specific URL
@@ -41,9 +47,22 @@ class AnnotationStorage {
   }
 
   /**
-   * Save an annotation
+   * Save an annotation (with mutex lock to prevent race conditions)
    */
   async saveAnnotation(annotation: Annotation): Promise<void> {
+    // Wait for any pending save operations to complete
+    await this.saveLock;
+    
+    // Queue this save operation
+    this.saveLock = this._saveAnnotation(annotation);
+    
+    return this.saveLock;
+  }
+
+  /**
+   * Internal save method (called within lock)
+   */
+  private async _saveAnnotation(annotation: Annotation): Promise<void> {
     try {
       const result = await chrome.storage.local.get(AnnotationStorage.STORAGE_KEY);
       const stored: StoredAnnotations = result[AnnotationStorage.STORAGE_KEY] || {};
@@ -72,9 +91,22 @@ class AnnotationStorage {
   }
 
   /**
-   * Delete an annotation
+   * Delete an annotation (with mutex lock to prevent race conditions)
    */
   async deleteAnnotation(url: string, annotationId: string): Promise<void> {
+    // Wait for any pending save operations to complete
+    await this.saveLock;
+    
+    // Queue this delete operation
+    this.saveLock = this._deleteAnnotation(url, annotationId);
+    
+    return this.saveLock;
+  }
+
+  /**
+   * Internal delete method (called within lock)
+   */
+  private async _deleteAnnotation(url: string, annotationId: string): Promise<void> {
     try {
       const result = await chrome.storage.local.get(AnnotationStorage.STORAGE_KEY);
       const stored: StoredAnnotations = result[AnnotationStorage.STORAGE_KEY] || {};

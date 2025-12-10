@@ -46,14 +46,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CONTRIBUTING.md with code style guide and PR process
 - Practical code examples in API_REFERENCE.md
 
-#### Error Handling
+#### Error Handling & Resilience
 - React Error Boundaries in popup and sidepanel to prevent crashes
-- Retry utility with exponential backoff for API calls
-- Rate limiter utility using token bucket algorithm
+- Retry utility with exponential backoff for API calls (applied to all Nexus queries)
+- Rate limiter utility using token bucket algorithm (Nexus + Pubky SDK calls)
 
 #### Developer Experience
-- SessionContext for React state management
-- Section markers and architecture docs in content.ts
+- SessionContext for React state management (popup + sidepanel now consume provider)
+- Content script split into dedicated modules (AnnotationManager, DrawingManager, PubkyURLHandler)
 - Type improvements: replaced `any` with `unknown`/generics
 
 #### Security
@@ -62,9 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Typed NexusPost relationships and bookmark fields
 
 ### Changed
-- Updated nexus-client.ts to use retry logic for resilience
+- Updated nexus-client.ts to use retry logic for resilience (with unified rate limiting)
 - Improved AuthToken type usage in auth.ts
-- Added 40+ new unit tests (207 total passing)
+- Added 40+ new unit tests (207 total passing) and eliminated act() warnings
 
 ### Fixed
 - TypeScript strict mode compliance in tests

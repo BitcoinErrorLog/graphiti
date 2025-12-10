@@ -3,6 +3,10 @@ import { storage } from './storage';
 import { nexusClient, NexusPost } from './nexus-client';
 import { PubkySpecsBuilder, PubkyAppPostKind } from 'pubky-app-specs';
 import { generateUrlHashTag } from './crypto';
+import { withRateLimit, apiRateLimiters } from './rate-limiter';
+import ErrorHandler from './error-handler';
+import { measureAPICall } from './performance-monitor';
+import { validateResponse, parseJsonResponse } from './response-helpers';
 
 /**
  * Pubky API using official SDK for homeserver operations
@@ -32,7 +36,11 @@ class PubkyAPISDK {
       this.pubky = new Client();
       logger.info('PubkyAPISDK', 'Pubky Client initialized');
     } catch (error) {
-      logger.error('PubkyAPISDK', 'Failed to initialize Pubky Client', error as Error);
+      ErrorHandler.handle(error, {
+        context: 'PubkyAPISDK',
+        data: { operation: 'initializePubky' },
+        showNotification: false,
+      });
     }
   }
 
@@ -46,13 +54,40 @@ class PubkyAPISDK {
     return this.pubky;
   }
 
+  private async rateLimitedFetch(path: string, init?: RequestInit): Promise<Response> {
+    await this.ensurePubky();
+    return measureAPICall(`pubky:${path}`, () =>
+      withRateLimit(() => this.pubky.fetch(path, init), apiRateLimiters.pubky)
+    );
+  }
+
+  private async rateLimitedList(
+    path: string,
+    cursor: any = null,
+    recursive = false,
+    limit = 100,
+    includeMetadata = false
+  ): Promise<any> {
+    await this.ensurePubky();
+    return measureAPICall(`pubky:list:${path}`, () =>
+      withRateLimit(
+        () => this.pubky.list(path, cursor, recursive, limit, includeMetadata),
+        apiRateLimiters.pubky
+      )
+    );
+  }
+
   /**
    * Get authenticated session for storage operations
    */
   private async getAuthenticatedSession(): Promise<any> {
     const session = await storage.getSession();
     if (!session) {
-      throw new Error('Not authenticated');
+      ErrorHandler.handleAndThrow(new Error('Not authenticated'), {
+        context: 'PubkyAPISDK',
+        data: { operation: 'getAuthenticatedSession' },
+        userMessage: 'Please sign in to continue.',
+      });
     }
     return session;
   }
@@ -68,7 +103,6 @@ class PubkyAPISDK {
       const session = await this.getAuthenticatedSession();
       logger.info('PubkyAPISDK', 'Creating bookmark for URL', { url });
 
-      await this.ensurePubky();
       const builder = new PubkySpecsBuilder(session.pubky);
 
       // Step 1: Create a link post with the HTTP URL
@@ -85,14 +119,21 @@ class PubkyAPISDK {
       const postUri = postResult.meta.url;
 
       try {
-        const postResponse = await this.pubky.fetch(postUri, {
+        const postResponse = await this.rateLimitedFetch(postUri, {
           method: 'PUT',
           body: JSON.stringify(post),
           credentials: 'include',
         });
 
         if (!postResponse.ok) {
-          throw new Error(`Failed to create post: HTTP ${postResponse.status}`);
+          ErrorHandler.handleAndThrow(
+            new Error(`Failed to create post: HTTP ${postResponse.status}`),
+            {
+              context: 'PubkyAPISDK',
+              data: { operation: 'createBookmark', status: postResponse.status },
+              userMessage: 'Failed to create bookmark. Please try again.',
+            }
+          );
         }
 
         logger.info('PubkyAPISDK', 'Link post created', { 
@@ -123,7 +164,7 @@ class PubkyAPISDK {
       const bookmarkId = bookmarkResult.meta.id;
       
       try {
-        const response = await this.pubky.fetch(fullPath, {
+        const response = await this.rateLimitedFetch(fullPath, {
           method: 'PUT',
           body: JSON.stringify(bookmark),
           credentials: 'include',
@@ -149,10 +190,13 @@ class PubkyAPISDK {
       }
       
       return { fullPath, bookmarkId, postUri };
-    } catch (error) {
-      logger.error('PubkyAPISDK', 'Failed to create bookmark', error as Error);
-      throw error;
-    }
+      } catch (error) {
+        ErrorHandler.handleAndThrow(error, {
+          context: 'PubkyAPISDK',
+          data: { operation: 'createBookmark', url },
+          userMessage: 'Failed to create bookmark. Please try again.',
+        });
+      }
   }
 
   /**
@@ -171,10 +215,8 @@ class PubkyAPISDK {
       const fullPath = result.meta.url;
       
       // Delete from homeserver using SDK
-      await this.ensurePubky();
-      
       try {
-        await this.pubky.fetch(fullPath, {
+        await this.rateLimitedFetch(fullPath, {
           method: 'DELETE',
           credentials: 'include',
         });
@@ -213,7 +255,7 @@ class PubkyAPISDK {
 
         // Write to homeserver using SDK
         try {
-          await this.pubky.fetch(fullPath, {
+          await this.rateLimitedFetch(fullPath, {
             method: 'PUT',
             body: JSON.stringify(tag),
           });
@@ -247,8 +289,6 @@ class PubkyAPISDK {
       const session = await this.getAuthenticatedSession();
       logger.info('PubkyAPISDK', 'Creating link post', { url, tags });
 
-      await this.ensurePubky();
-
       // Use official pubky-app-specs builder
       const builder = new PubkySpecsBuilder(session.pubky);
       const result = builder.createPost(
@@ -264,7 +304,7 @@ class PubkyAPISDK {
 
       // Write post to homeserver
       try {
-        await this.pubky.fetch(fullPath, {
+        await this.rateLimitedFetch(fullPath, {
           method: 'PUT',
           body: JSON.stringify(post),
           credentials: 'include',
@@ -312,14 +352,13 @@ class PubkyAPISDK {
    */
   async readPublicData(pubky: string, path: string): Promise<any> {
     try {
-      await this.ensurePubky();
-      
       const fullPath = `pubky://${pubky}${path}`;
       logger.debug('PubkyAPISDK', 'Reading public data', { fullPath });
 
       // Use the client's fetch method to get data
-      const response = await this.pubky.fetch(fullPath);
-      const data = await response.json();
+      const response = await this.rateLimitedFetch(fullPath);
+      validateResponse(response);
+      const data = await parseJsonResponse(response);
       
       logger.info('PubkyAPISDK', 'Public data read successfully', { path });
       return data;
@@ -334,13 +373,11 @@ class PubkyAPISDK {
    */
   async listPublicDirectory(pubky: string, path: string, limit: number = 10): Promise<string[]> {
     try {
-      await this.ensurePubky();
-      
       const fullPath = `pubky://${pubky}${path}`;
       logger.debug('PubkyAPISDK', 'Listing directory', { fullPath });
 
       // Use the client's list method
-      const entries = await this.pubky.list(fullPath, null, false, limit, false);
+      const entries = await this.rateLimitedList(fullPath, null, false, limit, false);
 
       const paths = entries.map((entry: any) => entry);
       
@@ -358,12 +395,10 @@ class PubkyAPISDK {
   async uploadFile(path: string, content: string, contentType: string = 'application/json'): Promise<string> {
     try {
       const session = await this.getAuthenticatedSession();
-      await this.ensurePubky();
-
       const fullPath = `pubky://${session.pubky}${path}`;
       logger.debug('PubkyAPISDK', 'Uploading file', { fullPath });
 
-      const response = await this.pubky.fetch(fullPath, {
+      const response = await this.rateLimitedFetch(fullPath, {
         method: 'PUT',
         headers: {
           'Content-Type': contentType,
@@ -389,12 +424,10 @@ class PubkyAPISDK {
    */
   async getFile(pubky: string, path: string): Promise<string> {
     try {
-      await this.ensurePubky();
-      
       const fullPath = `pubky://${pubky}${path}`;
       logger.debug('PubkyAPISDK', 'Getting file', { fullPath });
 
-      const response = await this.pubky.fetch(fullPath);
+      const response = await this.rateLimitedFetch(fullPath);
       const data = await response.text();
       
       logger.info('PubkyAPISDK', 'File retrieved successfully', { path });
@@ -411,12 +444,10 @@ class PubkyAPISDK {
   async deleteFile(path: string): Promise<void> {
     try {
       const session = await this.getAuthenticatedSession();
-      await this.ensurePubky();
-
       const fullPath = `pubky://${session.pubky}${path}`;
       logger.debug('PubkyAPISDK', 'Deleting file', { fullPath });
 
-      const response = await this.pubky.fetch(fullPath, {
+      const response = await this.rateLimitedFetch(fullPath, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -437,12 +468,10 @@ class PubkyAPISDK {
    */
   async listFiles(pubky: string, path: string): Promise<any[]> {
     try {
-      await this.ensurePubky();
-      
       const fullPath = `pubky://${pubky}${path}`;
       logger.debug('PubkyAPISDK', 'Listing files', { fullPath });
 
-      const entries = await this.pubky.list(fullPath, null, false, 100, false);
+      const entries = await this.rateLimitedList(fullPath, null, false, 100, false);
       
       const files = entries.map((entry: any) => ({
         name: entry.split('/').pop() || entry,
@@ -589,17 +618,14 @@ class PubkyAPISDK {
     selectedText: string,
     comment: string,
     metadata: {
-      startPath: string;
-      endPath: string;
-      startOffset: number;
-      endOffset: number;
+      prefix: string;
+      exact: string;
+      suffix: string;
     }
   ): Promise<string> {
     try {
       const session = await this.getAuthenticatedSession();
       logger.info('PubkyAPISDK', 'Creating annotation post', { url, selectedText: selectedText.substring(0, 50) });
-
-      await this.ensurePubky();
 
       // Create content that includes the annotation details
       const content = JSON.stringify({
@@ -625,7 +651,7 @@ class PubkyAPISDK {
 
       // Write post to homeserver
       try {
-        await this.pubky.fetch(fullPath, {
+        await this.rateLimitedFetch(fullPath, {
           method: 'PUT',
           body: JSON.stringify(post),
           credentials: 'include',

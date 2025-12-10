@@ -8,8 +8,9 @@ Shared utility functions and classes used across the extension.
 
 | Module | Purpose |
 |--------|---------|
-| `auth.ts` | Core authentication utilities |
-| `auth-sdk.ts` | AuthManager using Pubky SDK |
+| `auth-sdk.ts` | Authentication via official Pubky SDK (uses `@synonymdev/pubky`) |
+
+**Homeserver Resolution:** The homeserver URL is derived from the user's public key: `'pubky://' + publicKey.z32()`. This ensures proper routing via the Pubky DHT without hardcoded URLs.
 
 ### Storage
 
@@ -33,6 +34,12 @@ Shared utility functions and classes used across the extension.
 | Module | Purpose |
 |--------|---------|
 | `crypto.ts` | SHA-256, Base64URL, UTF-16 hash encoding, auth tokens |
+
+### Validation
+
+| Module | Purpose |
+|--------|---------|
+| `validation.ts` | Centralized input validation for URLs, text, tags, profiles |
 
 ### UI Utilities
 
@@ -114,6 +121,48 @@ import { getTagColor, getTagStyle } from './tag-colors';
 
 const color = getTagColor('javascript');  // '#2563EB'
 const style = getTagStyle('javascript');  // { backgroundColor, color }
+```
+
+### Validation
+
+```typescript
+import { 
+  validateUrl, 
+  validateAnnotation,
+  validateProfile,
+  validateTags,
+  parseAndValidateTags,
+  VALIDATION_LIMITS 
+} from './validation';
+
+// Validate URL
+const urlResult = validateUrl('https://example.com');
+if (!urlResult.valid) {
+  console.error(urlResult.error);
+}
+
+// Validate annotation data
+const annotationResult = validateAnnotation({
+  url: 'https://example.com',
+  selectedText: 'Some text',
+  comment: 'My comment',
+});
+
+// Validate profile data
+const profileResult = validateProfile({
+  name: 'John Doe',
+  bio: 'Hello world',
+  links: [{ title: 'Twitter', url: 'https://twitter.com/john' }],
+});
+
+// Parse and validate tags from user input
+const tagResult = parseAndValidateTags('hello, world, test');
+if (tagResult.valid) {
+  console.log(tagResult.sanitizedTags); // ['hello', 'world', 'test']
+}
+
+// Access validation limits
+console.log(VALIDATION_LIMITS.COMMENT_MAX_LENGTH); // 2000
 ```
 
 ### Pubky API SDK
