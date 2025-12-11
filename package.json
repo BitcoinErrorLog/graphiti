@@ -7,6 +7,8 @@
     "dev": "vite build --watch --mode development",
     "build": "tsc && vite build && vite build --config vite.content.config.ts",
     "build:check": "npm run build && node check-build.js",
+    "test:all": "node test-build-and-features.js",
+    "precommit": "npm run build:check && npm test -- --run",
     "build:analyze": "tsc && vite build && npm run analyze",
     "analyze": "npx vite-bundle-visualizer --open",
     "preview": "vite preview",

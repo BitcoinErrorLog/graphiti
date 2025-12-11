@@ -71,6 +71,17 @@ const mockChromeRuntime = {
 
 global.chrome = {
   runtime: mockChromeRuntime as any,
+  storage: {
+    local: {
+      get: vi.fn((key) => {
+        if (key === 'annotationsEnabled') {
+          return Promise.resolve({ annotationsEnabled: true });
+        }
+        return Promise.resolve({});
+      }),
+      set: vi.fn(() => Promise.resolve()),
+    },
+  },
 } as any;
 
 describe('AnnotationManager', () => {
