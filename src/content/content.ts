@@ -15,6 +15,10 @@ import { PubkyURLHandler } from './PubkyURLHandler';
 
 const initializeContentScript = () => {
   logger.info('ContentScript', 'Bootstrapping managers');
+  
+  // Mark that content script has loaded (for testing)
+  (window as any).__graphitiContentScriptLoaded = true;
+  
   new AnnotationManager();
   new DrawingManager();
   new PubkyURLHandler();

@@ -17,7 +17,8 @@
     "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:errors": "node run-e2e-with-error-capture.js"
   },
   "dependencies": {
     "@synonymdev/pubky": "latest",

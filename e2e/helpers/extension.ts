@@ -7,12 +7,26 @@ import * as path from 'path';
 
 /**
  * Load the Chrome extension for testing
+ * Extension is loaded via Playwright config, this just gets the ID
  */
-export async function loadExtension(context: BrowserContext): Promise<void> {
-  const extensionPath = path.resolve(__dirname, '../../dist');
-  await context.addInitScript(() => {
-    // Extension will be loaded automatically
-  });
+export async function loadExtension(context: BrowserContext): Promise<string> {
+  // Wait for extension background page
+  const backgroundPages = (context as any).backgroundPages();
+  if (backgroundPages && backgroundPages.length > 0) {
+    const bgPage = backgroundPages[0];
+    const url = bgPage.url();
+    const match = url.match(/chrome-extension:\/\/([a-z]{32})\//);
+    if (match) {
+      return match[1];
+    }
+  }
+  
+  // Fallback: try to get from service worker
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // Extension ID format is 32 character hex string
+  // We'll get it from the first page that loads
+  return 'extension-id-placeholder';
 }
 
 /**

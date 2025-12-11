@@ -64,7 +64,15 @@ export class AnnotationManager {
     logger.info('ContentScript', 'Initializing annotation manager');
     this.injectStyles();
     
-    // Load annotation enabled setting (default: true)
+    // Bind handlers first (before async operations)
+    this.mouseUpHandler = this.handleTextSelection.bind(this);
+    this.messageHandler = this.handleMessage.bind(this);
+    
+    // Set up event listeners immediately
+    document.addEventListener('mouseup', this.mouseUpHandler);
+    chrome.runtime.onMessage.addListener(this.messageHandler);
+    
+    // Load annotation enabled setting (default: true) - async, but don't block
     // Use chrome.storage.local directly - don't import utils/storage which has dependencies
     try {
       const result = await chrome.storage.local.get('annotationsEnabled');
@@ -74,13 +82,6 @@ export class AnnotationManager {
       logger.warn('ContentScript', 'Failed to load annotation setting, defaulting to enabled', error as Error);
       this.annotationsEnabled = true;
     }
-    
-    // Bind handlers once for cleanup
-    this.mouseUpHandler = this.handleTextSelection.bind(this);
-    this.messageHandler = this.handleMessage.bind(this);
-    
-    document.addEventListener('mouseup', this.mouseUpHandler);
-    chrome.runtime.onMessage.addListener(this.messageHandler);
     
     // Listen for toggle messages
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
