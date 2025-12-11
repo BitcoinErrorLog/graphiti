@@ -43,20 +43,44 @@ class PubkyAPISDK {
   private async initializePubky() {
     if (!this.isClientContextAvailable()) {
       const error = new Error('Pubky Client requires window object (not available in service workers)');
-      logger.warn('PubkyAPISDK', 'Cannot initialize Pubky Client in service worker context', error);
+      // Use console directly to avoid logger issues
+      console.warn('[PubkyAPISDK] Cannot initialize Pubky Client in service worker context', error);
       throw error;
     }
 
     try {
-      const { Client } = await import('@synonymdev/pubky');
+      // Dynamic import with error handling - the package itself might access window
+      const pubkyModule = await import('@synonymdev/pubky').catch((importError) => {
+        // If import fails due to window issues, wrap the error
+        if (importError.message?.includes('window') || !this.isClientContextAvailable()) {
+          throw new Error('Pubky Client requires window object (not available in service workers)');
+        }
+        throw importError;
+      });
+      
+      const { Client } = pubkyModule;
+      
+      // Check window again before creating Client (it might access window in constructor)
+      if (!this.isClientContextAvailable()) {
+        throw new Error('Pubky Client requires window object (not available in service workers)');
+      }
+      
       this.pubky = new Client();
       logger.info('PubkyAPISDK', 'Pubky Client initialized');
     } catch (error) {
-      ErrorHandler.handle(error, {
-        context: 'PubkyAPISDK',
-        data: { operation: 'initializePubky' },
-        showNotification: false,
-      });
+      // Use console directly to avoid circular logger issues
+      console.error('[PubkyAPISDK] Failed to initialize Pubky Client', error);
+      
+      // Only use ErrorHandler if it won't cause issues
+      try {
+        ErrorHandler.handle(error as Error, {
+          context: 'PubkyAPISDK',
+          data: { operation: 'initializePubky' },
+          showNotification: false,
+        });
+      } catch {
+        // Ignore if ErrorHandler fails
+      }
       throw error;
     }
   }
@@ -803,5 +827,7 @@ class PubkyAPISDK {
 
 }
 
+// Export singleton instance - constructor is now safe (doesn't initialize)
+// Methods that need window will check before using it
 export const pubkyAPISDK = PubkyAPISDK.getInstance();
 
