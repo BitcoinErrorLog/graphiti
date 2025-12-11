@@ -66,13 +66,26 @@ class ErrorCapture {
     if (typeof console !== 'undefined' && console.error) {
       const originalError = console.error;
       console.error = (...args: any[]) => {
-        const message = args.map(arg => 
-          typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-        ).join(' ');
-        this.captureError({
-          message: `Console Error: ${message}`,
-          source: 'console',
-        });
+        try {
+          const message = args.map(arg => {
+            if (typeof arg === 'object') {
+              try {
+                // Limit string length to prevent "Invalid string length" errors
+                const str = JSON.stringify(arg);
+                return str.length > 1000 ? str.substring(0, 1000) + '...' : str;
+              } catch {
+                return String(arg).substring(0, 200);
+              }
+            }
+            return String(arg).substring(0, 200);
+          }).join(' ');
+          this.captureError({
+            message: `Console Error: ${message}`,
+            source: 'console',
+          });
+        } catch (e) {
+          // Ignore errors in error capture
+        }
         originalError.apply(console, args);
       };
     }

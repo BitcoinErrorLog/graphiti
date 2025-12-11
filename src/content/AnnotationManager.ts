@@ -381,9 +381,12 @@ export class AnnotationManager {
     }
 
     // Don't hide button if clicking on the annotation button itself
-    const target = event.target as HTMLElement;
-    if (target?.closest('.pubky-annotation-button') || target?.closest('.pubky-annotation-modal')) {
-      return;
+    const target = event.target;
+    if (target && typeof target === 'object' && 'closest' in target) {
+      const element = target as HTMLElement;
+      if (element.closest('.pubky-annotation-button') || element.closest('.pubky-annotation-modal')) {
+        return;
+      }
     }
 
     const selection = window.getSelection();

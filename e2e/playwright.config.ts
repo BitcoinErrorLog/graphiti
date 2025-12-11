@@ -1,11 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
 
 /**
  * Playwright configuration for E2E testing of Graphiti Chrome Extension
  * 
  * Tests Chrome extension functionality in a real browser environment.
+ * Extensions require persistent context to work properly.
  */
+const extensionPath = path.resolve(__dirname, '../../dist');
+
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false, // Run sequentially to avoid extension conflicts
@@ -17,13 +22,8 @@ export default defineConfig({
   use: {
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    // Load Chrome extension
-    launchOptions: {
-      args: [
-        `--disable-extensions-except=${path.resolve(__dirname, '../../dist')}`,
-        `--load-extension=${path.resolve(__dirname, '../../dist')}`,
-      ],
-    },
+    // Use persistent context for extension loading
+    channel: 'chromium',
   },
 
   projects: [
@@ -31,14 +31,16 @@ export default defineConfig({
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
-        // Load extension
-        launchOptions: {
-          args: [
-            `--disable-extensions-except=${path.resolve(__dirname, '../../dist')}`,
-            `--load-extension=${path.resolve(__dirname, '../../dist')}`,
-          ],
-        },
+        // Extension will be loaded via globalSetup
       },
     },
   ],
+  
+  // Global setup to create persistent context with extension
+  globalSetup: async () => {
+    // Ensure dist directory exists
+    if (!fs.existsSync(extensionPath)) {
+      throw new Error(`Extension not found at ${extensionPath}. Run 'npm run build' first.`);
+    }
+  },
 });

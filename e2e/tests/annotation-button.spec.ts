@@ -3,17 +3,51 @@
  * This test captures browser console errors and validates the button appears
  */
 
-import { test, expect } from '@playwright/test';
-import { loadExtension, getExtensionId } from '../helpers/extension';
+import { test, expect, chromium } from '@playwright/test';
+import * as path from 'path';
+import * as os from 'os';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 test.describe('Annotation Button Feature', () => {
   let extensionId: string;
   let consoleErrors: string[] = [];
   let consoleWarnings: string[] = [];
+  let context: any;
 
-  test.beforeEach(async ({ context }) => {
-    // Load extension
-    extensionId = await loadExtension(context);
+  test.beforeAll(async () => {
+    // Create persistent context with extension loaded
+    const extensionPath = path.resolve(__dirname, '../../dist');
+    const userDataDir = path.join(os.tmpdir(), `playwright-extension-test-${Date.now()}`);
+    
+    context = await chromium.launchPersistentContext(userDataDir, {
+      headless: false, // Extensions need headed mode
+      channel: 'chromium',
+      args: [
+        `--disable-extensions-except=${extensionPath}`,
+        `--load-extension=${extensionPath}`,
+      ],
+    });
+    
+    // Wait for extension to load
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Get extension ID from service worker
+    const [serviceWorker] = context.serviceWorkers();
+    if (serviceWorker) {
+      const url = serviceWorker.url();
+      const match = url.match(/chrome-extension:\/\/([a-z]{32})\//);
+      if (match) {
+        extensionId = match[1];
+      }
+    }
+  });
+
+  test.beforeEach(async () => {
+    // Create new page in the persistent context
+    const page = await context.newPage();
     
     // Capture console errors and warnings
     context.on('page', (page) => {
@@ -47,7 +81,8 @@ test.describe('Annotation Button Feature', () => {
     consoleWarnings = [];
   });
 
-  test('annotation button should appear when text is selected', async ({ context, page }) => {
+  test('annotation button should appear when text is selected', async () => {
+    const page = await context.newPage();
     // Navigate to a test page
     await page.goto('https://example.com', { waitUntil: 'networkidle' });
     
@@ -158,7 +193,8 @@ test.describe('Annotation Button Feature', () => {
     }
   });
 
-  test('should capture and report all browser errors', async ({ context, page }) => {
+  test('should capture and report all browser errors', async () => {
+    const page = await context.newPage();
     await page.goto('https://example.com', { waitUntil: 'networkidle' });
     await page.waitForTimeout(2000); // Wait for extension to initialize
     
@@ -177,12 +213,11 @@ test.describe('Annotation Button Feature', () => {
         console.log(`  ${i + 1}. ${err}`);
       });
       
-      // Write errors to file for inspection
-      const fs = require('fs');
-      const path = require('path');
-      const errorFile = path.join(__dirname, '../../browser-errors.log');
-      fs.writeFileSync(errorFile, consoleErrors.join('\n\n'));
-      console.log(`\n💾 Errors saved to: ${errorFile}`);
+      // Log errors (can't write to file from browser context)
+      if (consoleErrors.length > 0) {
+        console.log('\n📋 All Browser Errors:');
+        consoleErrors.forEach((err, i) => console.log(`  ${i + 1}. ${err}`));
+      }
     } else {
       console.log('✅ No console errors detected');
     }
@@ -204,5 +239,9 @@ test.describe('Annotation Button Feature', () => {
     if (consoleErrors.length > 0 || consoleWarnings.length > 0) {
       console.log(`\n📊 Summary: ${consoleErrors.length} errors, ${consoleWarnings.length} warnings`);
     }
+  });
+
+  test.afterAll(async () => {
+    await context.close();
   });
 });
