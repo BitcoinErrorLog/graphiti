@@ -5,11 +5,20 @@ import { PubkyURLHandler } from './PubkyURLHandler';
 
 // Initialize error capture for content script
 // Use dynamic import to avoid bundling issues in content script
-import('../utils/error-capture').then(() => {
-  logger.info('ContentScript', 'Error capture initialized');
-}).catch(() => {
-  // Error capture not available, continue anyway
-});
+// Wrap in try-catch to prevent errors from breaking content script
+// Note: This must be inside the function to avoid top-level await issues
+try {
+  // Use setTimeout to defer execution and avoid blocking initialization
+  setTimeout(() => {
+    import('../utils/error-capture').then(() => {
+      logger.info('ContentScript', 'Error capture initialized');
+    }).catch(() => {
+      // Error capture not available, continue anyway
+    });
+  }, 0);
+} catch (e) {
+  // Ignore import errors
+}
 
 /**
  * @fileoverview Content script bootstrapper that wires together the interactive

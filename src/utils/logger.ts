@@ -179,7 +179,17 @@ class Logger {
   async clearLogs() {
     this.logBuffer = [];
     if (this.isStorageAvailable) {
-      await chrome.storage.local.remove('debugLogs');
+      try {
+        // Double-check availability before use
+        if (typeof chrome === 'undefined' || !chrome?.storage?.local) {
+          this.isStorageAvailable = false;
+          return;
+        }
+        await chrome.storage.local.remove('debugLogs');
+      } catch (error) {
+        // Silently fail
+        this.isStorageAvailable = false;
+      }
     }
     this.info('Logger', 'Logs cleared');
   }
