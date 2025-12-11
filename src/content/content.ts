@@ -3,6 +3,14 @@ import { AnnotationManager } from './AnnotationManager';
 import { DrawingManager } from './DrawingManager';
 import { PubkyURLHandler } from './PubkyURLHandler';
 
+// Initialize error capture for content script
+// Use dynamic import to avoid bundling issues in content script
+import('../utils/error-capture').then(() => {
+  logger.info('ContentScript', 'Error capture initialized');
+}).catch(() => {
+  // Error capture not available, continue anyway
+});
+
 /**
  * @fileoverview Content script bootstrapper that wires together the interactive
  * experiences for annotations, drawings, and Pubky links.

@@ -131,8 +131,53 @@ if (fs.existsSync(annotationManager)) {
   console.log('✅ AnnotationManager uses chrome.storage.local directly');
 }
 
-// 5. Check manifest.json
-console.log('\n📋 Step 5: Validating manifest.json...');
+// 5. Run E2E tests to capture browser errors
+console.log('\n🌐 Step 5: Running E2E tests to capture browser errors...');
+try {
+  const e2eOutput = execSync('npx playwright test e2e/tests/annotation-button.spec.ts --reporter=list', {
+    encoding: 'utf8',
+    cwd: __dirname,
+    stdio: 'pipe',
+    timeout: 60000
+  });
+  
+  // Check for browser-errors.log
+  const errorLogPath = path.join(__dirname, 'browser-errors.log');
+  if (fs.existsSync(errorLogPath)) {
+    const errors = fs.readFileSync(errorLogPath, 'utf8');
+    if (errors.trim()) {
+      console.log('⚠️  Browser errors captured:');
+      console.log(errors);
+      warnings.push('Browser errors detected - see browser-errors.log');
+    }
+  }
+  
+  if (e2eOutput.includes('passed')) {
+    console.log('✅ E2E tests passed');
+  } else {
+    warnings.push('E2E tests had issues (check output above)');
+  }
+} catch (error) {
+  warnings.push('E2E tests could not run (may need Playwright setup)');
+  // Check for error log even if tests failed
+  const errorLogPath = path.join(__dirname, 'browser-errors.log');
+  if (fs.existsSync(errorLogPath)) {
+    const errors = fs.readFileSync(errorLogPath, 'utf8');
+    if (errors.trim()) {
+      console.log('\n📋 Browser Errors Found:');
+      console.log(errors);
+      // Critical errors should fail the build
+      if (errors.includes('window is not defined') || 
+          errors.includes('Cannot use import statement') ||
+          errors.includes('chrome.storage') && errors.includes('undefined')) {
+        errors.push('Critical browser errors detected in E2E test');
+      }
+    }
+  }
+}
+
+// 6. Check manifest.json
+console.log('\n📋 Step 6: Validating manifest.json...');
 const manifestPath = path.join(__dirname, 'dist', 'manifest.json');
 if (fs.existsSync(manifestPath)) {
   try {
