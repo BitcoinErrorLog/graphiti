@@ -51,10 +51,19 @@ class Logger {
   private isStorageAvailable = false;
 
   private constructor() {
-    // Check if chrome.storage is available (not in content scripts)
-    this.isStorageAvailable = typeof chrome !== 'undefined' && 
-                               typeof chrome.storage !== 'undefined' && 
-                               typeof chrome.storage.local !== 'undefined';
+    // Check if chrome.storage is available
+    // Must check chrome first, then chrome.storage, then chrome.storage.local
+    try {
+      this.isStorageAvailable = typeof chrome !== 'undefined' && 
+                                 chrome !== null &&
+                                 typeof chrome.storage !== 'undefined' && 
+                                 chrome.storage !== null &&
+                                 typeof chrome.storage.local !== 'undefined' &&
+                                 chrome.storage.local !== null;
+    } catch (e) {
+      this.isStorageAvailable = false;
+    }
+    
     if (this.isStorageAvailable) {
       this.loadLogs();
     }
@@ -70,21 +79,33 @@ class Logger {
   private async loadLogs() {
     if (!this.isStorageAvailable) return;
     try {
+      // Double-check availability before use
+      if (typeof chrome === 'undefined' || !chrome?.storage?.local) {
+        this.isStorageAvailable = false;
+        return;
+      }
       const result = await chrome.storage.local.get('debugLogs');
       if (result.debugLogs) {
         this.logBuffer = result.debugLogs;
       }
     } catch (error) {
-      console.error('Failed to load logs:', error);
+      // Silently fail - logging shouldn't break the app
+      this.isStorageAvailable = false;
     }
   }
 
   private async saveLogs() {
     if (!this.isStorageAvailable) return;
     try {
+      // Double-check availability before use
+      if (typeof chrome === 'undefined' || !chrome?.storage?.local) {
+        this.isStorageAvailable = false;
+        return;
+      }
       await chrome.storage.local.set({ debugLogs: this.logBuffer });
     } catch (error) {
-      console.error('Failed to save logs:', error);
+      // Silently fail - logging shouldn't break the app
+      this.isStorageAvailable = false;
     }
   }
 
