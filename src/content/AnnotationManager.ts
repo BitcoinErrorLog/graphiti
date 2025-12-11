@@ -65,10 +65,10 @@ export class AnnotationManager {
     this.injectStyles();
     
     // Load annotation enabled setting (default: true)
+    // Use chrome.storage.local directly - don't import utils/storage which has dependencies
     try {
-      const { storage } = await import('../utils/storage');
-      const enabled = await storage.getSetting<boolean>('annotationsEnabled', true);
-      this.annotationsEnabled = enabled ?? true;
+      const result = await chrome.storage.local.get('annotationsEnabled');
+      this.annotationsEnabled = result.annotationsEnabled ?? true;
       logger.info('ContentScript', 'Annotation enabled setting loaded', { enabled: this.annotationsEnabled });
     } catch (error) {
       logger.warn('ContentScript', 'Failed to load annotation setting, defaulting to enabled', error as Error);
@@ -459,8 +459,8 @@ export class AnnotationManager {
     this.annotationsEnabled = newValue;
     
     try {
-      const { storage } = await import('../utils/storage');
-      await storage.saveSetting('annotationsEnabled', newValue);
+      // Save setting directly using chrome.storage.local
+      await chrome.storage.local.set({ annotationsEnabled: newValue });
       logger.info('ContentScript', 'Annotations toggled via keyboard', { enabled: newValue });
       
       // Show visual feedback
