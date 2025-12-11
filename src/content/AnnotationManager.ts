@@ -375,8 +375,15 @@ export class AnnotationManager {
   }
 
   private handleTextSelection(event: MouseEvent) {
+    logger.debug('ContentScript', 'handleTextSelection called', { 
+      annotationsEnabled: this.annotationsEnabled,
+      pageX: event.pageX,
+      pageY: event.pageY 
+    });
+
     // Don't process if annotations are disabled
     if (!this.annotationsEnabled) {
+      logger.debug('ContentScript', 'Annotations disabled, skipping');
       return;
     }
 
@@ -385,12 +392,14 @@ export class AnnotationManager {
     if (target && typeof target === 'object' && 'closest' in target) {
       const element = target as HTMLElement;
       if (element.closest('.pubky-annotation-button') || element.closest('.pubky-annotation-modal')) {
+        logger.debug('ContentScript', 'Clicked on annotation UI, ignoring');
         return;
       }
     }
 
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) {
+      logger.debug('ContentScript', 'No selection or collapsed selection');
       // Delay hiding to allow button click to register
       setTimeout(() => {
         const button = document.querySelector('.pubky-annotation-button');
@@ -402,16 +411,27 @@ export class AnnotationManager {
     }
 
     const selectedText = selection.toString().trim();
+    logger.debug('ContentScript', 'Text selected', { 
+      length: selectedText.length,
+      preview: selectedText.substring(0, 50) 
+    });
     
     // Validate selected text using centralized validation
     const validation = validateSelectedText(selectedText);
     if (!validation.valid) {
-      logger.debug('ContentScript', 'Selection validation failed', { error: validation.error });
+      logger.warn('ContentScript', 'Selection validation failed', { 
+        error: validation.error,
+        textLength: selectedText.length 
+      });
       return;
     }
 
     const range = selection.getRangeAt(0);
     this.currentSelection = { range, text: validation.sanitized || selectedText };
+    logger.info('ContentScript', 'Showing annotation button', { 
+      x: event.pageX,
+      y: event.pageY 
+    });
     this.showAnnotationButton(event.pageX, event.pageY);
   }
 
@@ -434,6 +454,7 @@ export class AnnotationManager {
     button.onmousedown = (e) => {
       e.preventDefault();
       e.stopPropagation();
+      logger.info('ContentScript', 'Annotation button clicked (mousedown)');
       // Show modal immediately on mousedown to prevent button from being hidden
       this.showAnnotationModal();
     };
@@ -442,6 +463,7 @@ export class AnnotationManager {
     button.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
+      logger.info('ContentScript', 'Annotation button clicked (click)');
       // If modal isn't already showing, show it
       if (!document.querySelector('.pubky-annotation-modal')) {
         this.showAnnotationModal();
@@ -449,6 +471,10 @@ export class AnnotationManager {
     };
 
     document.body.appendChild(button);
+    logger.info('ContentScript', 'Annotation button added to DOM', { 
+      x: button.style.left,
+      y: button.style.top 
+    });
   }
 
   private hideAnnotationButton() {

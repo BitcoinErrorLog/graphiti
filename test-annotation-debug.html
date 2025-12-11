@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Annotation Debug Test</title>
+</head>
+<body>
+  <h1>Test Page for Annotations</h1>
+  <p>Select some text on this page. A button should appear.</p>
+  <p>This is a test paragraph with some text that you can select to test the annotation feature.</p>
+  
+  <script>
+    // Check if content script loaded
+    setTimeout(() => {
+      if (window.__graphitiContentScriptLoaded) {
+        console.log('✅ Content script loaded');
+      } else {
+        console.error('❌ Content script NOT loaded');
+      }
+      
+      // Check if annotations are enabled
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        chrome.storage.local.get('annotationsEnabled', (result) => {
+          console.log('Annotations enabled:', result.annotationsEnabled !== false);
+        });
+      }
+      
+      // Listen for selection
+      document.addEventListener('mouseup', () => {
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed) {
+          console.log('Text selected:', selection.toString().substring(0, 50));
+          console.log('Selection length:', selection.toString().length);
+        }
+      });
+    }, 2000);
+  </script>
+</body>
+</html>
