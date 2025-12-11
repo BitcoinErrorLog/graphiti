@@ -15,9 +15,11 @@ import { validateResponse, parseJsonResponse } from './response-helpers';
 class PubkyAPISDK {
   private static instance: PubkyAPISDK;
   private pubky: any = null;
+  private initializationPromise: Promise<void> | null = null;
 
   private constructor() {
-    this.initializePubky();
+    // Don't initialize in constructor - wait until actually needed
+    // This prevents errors in service worker contexts where window is not available
   }
 
   static getInstance(): PubkyAPISDK {
@@ -28,9 +30,23 @@ class PubkyAPISDK {
   }
 
   /**
+   * Check if we're in a context that supports Pubky Client (has window)
+   */
+  private isClientContextAvailable(): boolean {
+    return typeof window !== 'undefined';
+  }
+
+  /**
    * Initialize Pubky client
+   * Only works in contexts with window (not service workers)
    */
   private async initializePubky() {
+    if (!this.isClientContextAvailable()) {
+      const error = new Error('Pubky Client requires window object (not available in service workers)');
+      logger.warn('PubkyAPISDK', 'Cannot initialize Pubky Client in service worker context', error);
+      throw error;
+    }
+
     try {
       const { Client } = await import('@synonymdev/pubky');
       this.pubky = new Client();
@@ -41,15 +57,25 @@ class PubkyAPISDK {
         data: { operation: 'initializePubky' },
         showNotification: false,
       });
+      throw error;
     }
   }
 
   /**
    * Ensure Pubky is initialized
+   * Throws if called in service worker context
    */
   private async ensurePubky(): Promise<any> {
+    if (!this.isClientContextAvailable()) {
+      throw new Error('Pubky Client operations require window object. Use offscreen document for service worker contexts.');
+    }
+
     if (!this.pubky) {
-      await this.initializePubky();
+      // Use a promise to prevent multiple simultaneous initializations
+      if (!this.initializationPromise) {
+        this.initializationPromise = this.initializePubky();
+      }
+      await this.initializationPromise;
     }
     return this.pubky;
   }
