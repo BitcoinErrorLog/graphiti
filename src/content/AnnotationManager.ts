@@ -428,11 +428,24 @@ export class AnnotationManager {
 
     const range = selection.getRangeAt(0);
     this.currentSelection = { range, text: validation.sanitized || selectedText };
+    
+    // Get the position from the selection's bounding rect, not just mouse coordinates
+    // This ensures the button appears near the selected text even if mouse moved
+    const rect = range.getBoundingClientRect();
+    const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+    
+    // Use selection rect if available, otherwise fall back to mouse position
+    const x = rect.width > 0 ? rect.right + scrollX : (event.pageX || rect.left + scrollX);
+    const y = rect.height > 0 ? rect.bottom + scrollY + 5 : (event.pageY || rect.top + scrollY);
+    
     logger.info('ContentScript', 'Showing annotation button', { 
-      x: event.pageX,
-      y: event.pageY 
+      x,
+      y,
+      rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+      mouse: { pageX: event.pageX, pageY: event.pageY }
     });
-    this.showAnnotationButton(event.pageX, event.pageY);
+    this.showAnnotationButton(x, y);
   }
 
   private showAnnotationButton(x: number, y: number) {
@@ -446,8 +459,38 @@ export class AnnotationManager {
       </svg>
       Add Annotation
     `;
-    button.style.left = `${x - 80}px`;
-    button.style.top = `${y + 10}px`;
+    
+    // Position button to the right and slightly below the selection
+    // Account for button width (approximately 140px) and add some padding
+    const buttonWidth = 140;
+    const buttonHeight = 40;
+    const padding = 10;
+    
+    // Calculate position relative to viewport
+    const viewportX = x - (window.pageXOffset || document.documentElement.scrollLeft);
+    const viewportY = y - (window.pageYOffset || document.documentElement.scrollTop);
+    
+    // Position button to the right of selection, or to the left if not enough space
+    let leftPos = viewportX + padding;
+    if (leftPos + buttonWidth > window.innerWidth) {
+      // Not enough space on right, position to the left
+      leftPos = viewportX - buttonWidth - padding;
+    }
+    
+    // Position button below selection, or above if not enough space
+    let topPos = viewportY + padding;
+    if (topPos + buttonHeight > window.innerHeight) {
+      // Not enough space below, position above
+      topPos = viewportY - buttonHeight - padding;
+    }
+    
+    // Ensure button stays within viewport bounds
+    leftPos = Math.max(10, Math.min(leftPos, window.innerWidth - buttonWidth - 10));
+    topPos = Math.max(10, Math.min(topPos, window.innerHeight - buttonHeight - 10));
+    
+    button.style.left = `${leftPos}px`;
+    button.style.top = `${topPos}px`;
+    button.style.position = 'fixed'; // Use fixed positioning relative to viewport
     
     // Use both mousedown and click to ensure the modal opens
     // mousedown fires before mouseup, so it prevents the button from being hidden
