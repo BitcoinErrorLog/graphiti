@@ -50,10 +50,19 @@ function MainView({
 
   const loadAnnotationSetting = async () => {
     try {
-      const enabled = await storage.getSetting<boolean>('annotationsEnabled', true);
-      setAnnotationsEnabled(enabled ?? true);
+      const result = await chrome.storage.local.get('annotationsEnabled');
+      // Default to true if not set, but respect explicit false
+      const enabled = result.annotationsEnabled !== undefined ? result.annotationsEnabled : true;
+      setAnnotationsEnabled(enabled);
+      
+      // If not set at all, initialize to true
+      if (result.annotationsEnabled === undefined) {
+        await chrome.storage.local.set({ annotationsEnabled: true });
+      }
     } catch (error) {
       logger.error('MainView', 'Failed to load annotation setting', error as Error);
+      // On error, default to enabled
+      setAnnotationsEnabled(true);
     }
   };
 

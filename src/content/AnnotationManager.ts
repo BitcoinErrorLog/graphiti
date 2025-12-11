@@ -76,7 +76,14 @@ export class AnnotationManager {
     // Use chrome.storage.local directly - don't import utils/storage which has dependencies
     try {
       const result = await chrome.storage.local.get('annotationsEnabled');
-      this.annotationsEnabled = result.annotationsEnabled ?? true;
+      // Default to true if not set, but respect explicit false
+      this.annotationsEnabled = result.annotationsEnabled !== undefined ? result.annotationsEnabled : true;
+      
+      // If not set at all, initialize to true
+      if (result.annotationsEnabled === undefined) {
+        await chrome.storage.local.set({ annotationsEnabled: true });
+      }
+      
       logger.info('ContentScript', 'Annotation enabled setting loaded', { enabled: this.annotationsEnabled });
     } catch (error) {
       logger.warn('ContentScript', 'Failed to load annotation setting, defaulting to enabled', error as Error);
