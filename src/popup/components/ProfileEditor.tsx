@@ -36,6 +36,11 @@ export function ProfileEditor() {
   const [showCropper, setShowCropper] = useState(false);
   const [imageFileToCrop, setImageFileToCrop] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [recoveryPassphrase, setRecoveryPassphrase] = useState('');
+  const [recoveryPassphraseConfirm, setRecoveryPassphraseConfirm] = useState('');
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [isExportingRecovery, setIsExportingRecovery] = useState(false);
   
   // Form state - Now matches Pubky App standard profile.json
   const [name, setName] = useState('');

@@ -33,6 +33,7 @@ function AnnotationCard({ annotation, onHighlight, onDelete, canDelete }: Annota
     <div 
       className="bg-[#1F1F1F] border border-[#3F3F3F] rounded-lg p-4 hover:border-[#667eea] transition-colors cursor-pointer"
       onClick={handleClick}
+      data-annotation-id={annotation.id}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
