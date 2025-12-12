@@ -5,7 +5,7 @@ import { resolve } from 'path';
 export default defineConfig({
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: process.env.NODE_ENV !== 'production',
     minify: 'esbuild',
     target: 'es2020',
     emptyOutDir: false, // Don't clear the dist folder (main build already created it)

@@ -127,11 +127,14 @@ describe('Popup App Integration', () => {
 
   const renderPopup = async () => {
     const { SessionProvider } = await import('../../contexts/SessionContext');
+    const { ThemeProvider } = await import('../../contexts/ThemeContext');
     await act(async () => {
       render(
-        <SessionProvider>
-          <App />
-        </SessionProvider>
+        <ThemeProvider>
+          <SessionProvider>
+            <App />
+          </SessionProvider>
+        </ThemeProvider>
       );
     });
   };

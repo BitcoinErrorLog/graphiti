@@ -39,7 +39,7 @@ export default defineConfig({
   plugins: [react(), copyStaticFiles()],
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: process.env.NODE_ENV !== 'production',
     minify: 'esbuild',
     target: 'es2020',
     rollupOptions: {
