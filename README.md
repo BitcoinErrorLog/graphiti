@@ -1,13 +1,14 @@
-# Graphiti - Pubky URL Tagger 🎨
+# Graphiti - Pubky URL Tagger
 
-A powerful Chrome extension that lets you **draw graffiti on web pages**, create text annotations, bookmark URLs, and share everything through the decentralized Pubky network. All your data syncs to your personal Pubky homeserver - no third-party tracking!
+A powerful Chrome extension that lets you draw graffiti on web pages, create text annotations, bookmark URLs, and share everything through the decentralized Pubky network. All your data syncs to your personal Pubky homeserver - no third-party tracking!
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/BitcoinErrorLog/graphiti)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## ✨ Features
+## Features
 
-### 🎨 **Drawing Mode**
+### Drawing Mode
+
 Draw graffiti directly on any webpage with a persistent canvas overlay:
 - **8-color palette** for vibrant drawings
 - **Adjustable brush thickness** (2-20px)
@@ -23,7 +24,8 @@ Draw graffiti directly on any webpage with a persistent canvas overlay:
 - Create visual notes on articles
 - Collaborative web graffiti (with shared URLs)
 
-### 📝 **Text Annotations**
+### Text Annotations
+
 Highlight text and add comments that persist:
 - Select any text on a page
 - Add detailed comments and notes
@@ -32,7 +34,8 @@ Highlight text and add comments that persist:
 - Click annotations to scroll to highlighted text
 - Search and filter your annotations
 
-### 🔖 **Bookmarks & Tags**
+### Bookmarks & Tags
+
 Organize and share your favorite content:
 - One-click bookmarking
 - Add custom tags to any URL
@@ -40,7 +43,8 @@ Organize and share your favorite content:
 - Tag-based discovery
 - View bookmarks from people you follow
 
-### 📱 **Social Feed**
+### Social Feed
+
 See what your network is sharing:
 - View posts about the current page
 - See bookmarks and annotations from followed users
@@ -48,7 +52,8 @@ See what your network is sharing:
 - Post your own content with tags
 - Engage with your decentralized network
 
-### 🔐 **Privacy-First Authentication & Key Management**
+### Privacy-First Authentication & Key Management
+
 Secure QR-based authentication with key backup:
 - Scan QR code with Pubky Ring mobile app
 - No passwords, no tracking
@@ -57,7 +62,8 @@ Secure QR-based authentication with key backup:
 - **Recovery file export** - Backup your keys with encrypted recovery files
 - Full control over your identity
 
-### 🛠️ **Developer Tools**
+### Developer Tools
+
 Built-in debugging and monitoring:
 - Real-time log viewer
 - Export logs for troubleshooting
@@ -65,7 +71,7 @@ Built-in debugging and monitoring:
 - Performance monitoring
 - Clear console interface
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation (For Users)
 
@@ -76,7 +82,7 @@ Built-in debugging and monitoring:
 4. Enable "Developer mode" (toggle in top-right)
 5. Click "Load unpacked"
 6. Select the extracted folder (not the zip file itself)
-7. Done! 🎉
+7. Done!
 
 **Note:** The zip file contains the pre-built extension. You don't need to build it yourself.
 
@@ -102,7 +108,7 @@ npm run build
 3. **Navigate to any website** (e.g., https://example.com)
 4. **Try drawing mode** - Press `Alt+D` and start drawing!
 
-## ⌨️ Keyboard Shortcuts
+## Keyboard Shortcuts
 
 | Shortcut | Action | Description |
 |----------|--------|-------------|
@@ -120,13 +126,13 @@ npm run build
 
 **Tip:** Press `Shift+?` in the popup or sidepanel to see all available shortcuts!
 
-## 📖 Usage Guide
+## Usage Guide
 
 ### Drawing on Web Pages
 
 **Activate Drawing Mode:**
 1. Navigate to any webpage
-2. Press `Alt+D` (or click 🎨 in popup)
+2. Press `Alt+D` (or click Drawing button in popup)
 3. A toolbar appears in the top-right corner
 
 **Drawing Controls:**
@@ -167,12 +173,12 @@ npm run build
 **Bookmark a Page:**
 1. Navigate to the page
 2. Click the extension icon
-3. Click "Bookmark Page" or "☆"
+3. Click "Bookmark Page" or star icon
 4. Bookmark saves locally and syncs to Pubky
 
 **Remove Bookmark:**
 1. Click the extension icon
-2. If already bookmarked, click "⭐ Bookmarked"
+2. If already bookmarked, click "Bookmarked"
 3. Bookmark is removed
 
 ### Tagging & Posting
@@ -193,7 +199,7 @@ npm run build
 
 **Open Feed:**
 1. Click the extension icon
-2. Click "📱 View Feed"
+2. Click "View Feed"
 3. Side panel opens on the right
 
 **Feed Tabs:**
@@ -205,22 +211,22 @@ npm run build
 
 **Edit Your Profile:**
 1. Click the extension icon
-2. Click "✏️ Edit Profile"
+2. Click "Edit Profile"
 3. Update your name, bio, avatar, status, and links
 4. Click "Save Profile" to sync to your homeserver
 
 **Export Recovery File (Key Backup):**
 1. Click the extension icon
-2. Click "✏️ Edit Profile"
+2. Click "Edit Profile"
 3. Scroll to "Key Backup" section
-4. Click "🔐 Export Recovery File"
+4. Click "Export Recovery File"
 5. Enter a strong passphrase (min 8 chars, letters + numbers)
 6. Confirm the passphrase
 7. File downloads automatically (`pubky-recovery-YYYY-MM-DD.recovery`)
 
 **Important:** Store your recovery file securely! You'll need it and your passphrase to restore your keys if you lose access to your device.
 
-## 🏗️ Architecture
+## Architecture
 
 ### Technology Stack
 
@@ -297,7 +303,7 @@ graphiti/
 - Annotation browser
 - Tab-based navigation
 
-## 🔌 Pubky Integration
+## Pubky Integration
 
 ### Data Storage Locations
 
@@ -381,7 +387,7 @@ All data syncs to your Pubky homeserver:
 }
 ```
 
-## 🛠️ Development
+## Development
 
 ### Prerequisites
 
@@ -393,7 +399,7 @@ All data syncs to your Pubky homeserver:
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/graphiti.git
+git clone https://github.com/BitcoinErrorLog/graphiti.git
 cd graphiti
 
 # Install dependencies
@@ -445,7 +451,7 @@ See [docs/TESTING.md](docs/TESTING.md) for detailed test documentation.
 3. Test each feature:
    - Drawing mode (`Alt+D`)
    - Annotations (select text)
-   - Bookmarks (click ☆)
+   - Bookmarks (click star icon)
    - Tags (add in popup)
    - Feed (view sidebar)
 
@@ -453,7 +459,7 @@ See [docs/TESTING.md](docs/TESTING.md) for detailed test documentation.
 - Open DevTools (F12)
 - Look for "[Graphiti]" log messages
 - Check for errors in red
-- Use "🔧 Debug" panel in popup
+- Use "Debug" panel in popup
 
 ### Adding New Features
 
@@ -480,7 +486,7 @@ See [docs/TESTING.md](docs/TESTING.md) for detailed test documentation.
 3. Return appropriate response
 4. Test with `chrome.runtime.sendMessage`
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Drawing Mode Issues
 
@@ -517,7 +523,7 @@ See [docs/TESTING.md](docs/TESTING.md) for detailed test documentation.
 - Verify you're signed in
 - Check Pubky homeserver is accessible
 - Look for sync errors in console
-- Check "🔧 Debug" panel for details
+- Check "Debug" panel for details
 
 **Annotations not appearing:**
 - Refresh the page
@@ -529,7 +535,7 @@ See [docs/TESTING.md](docs/TESTING.md) for detailed test documentation.
 
 Enable detailed logging:
 1. Open popup
-2. Click "🔧 Debug"
+2. Click "Debug"
 3. View all extension activity
 4. Filter by context or level
 5. Export logs if needed
@@ -542,7 +548,7 @@ Look for these log contexts:
 - `PubkyAPISDK` - API calls
 - `Auth` - Authentication
 
-## 📝 Known Limitations
+## Known Limitations
 
 1. **Drawing viewport-dependent** - Drawings match viewport size at creation
 2. **Chrome/Edge only** - Manifest V3 required
@@ -550,7 +556,7 @@ Look for these log contexts:
 4. **Content script required** - Some pages block content scripts
 5. **Drawing on scroll disabled** - Prevents misalignment issues
 
-## 🗺️ Roadmap
+## Roadmap
 
 ### Near-Term
 - [ ] Eraser tool for drawings
@@ -576,7 +582,7 @@ Look for these log contexts:
 - [ ] Advanced search and filters
 - [ ] Analytics dashboard
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Here's how:
 
@@ -597,17 +603,17 @@ Contributions are welcome! Here's how:
 - Write clear commit messages
 - Keep PRs focused and small
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **Pubky Protocol** - Decentralized identity and storage
 - **Pubky Team** - For the innovative protocol and SDK
 - **Open Source Community** - For amazing tools and libraries
 
-## 📞 Support & Documentation
+## Support & Documentation
 
 - **Issues:** [GitHub Issues](https://github.com/BitcoinErrorLog/graphiti/issues)
 - **Documentation:** See `/docs` folder for detailed technical documentation
@@ -615,14 +621,10 @@ MIT License - see [LICENSE](LICENSE) file for details
 - **Security:** See [SECURITY.md](SECURITY.md) for security information
 - **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
 - **Changelog:** See [CHANGELOG.md](CHANGELOG.md) for version history
-- **Debug:** Use built-in debug panel in extension (click 🔧 in popup)
-
-## 🌟 Star History
-
-If you find Graphiti useful, please star the repository!
+- **Debug:** Use built-in debug panel in extension (click Debug in popup)
 
 ---
 
-**Made with ❤️ for the decentralized web**
+**Made with care for the decentralized web**
 
-🎨 Draw freely, annotate wisely, share openly
+Draw freely, annotate wisely, share openly
