@@ -7,6 +7,8 @@ export default tseslint.config(
   {
     ignores: ['dist/', 'node_modules/', '*.config.js', '*.config.ts', '*.config.mjs'],
   },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
@@ -23,7 +25,6 @@ export default tseslint.config(
       'react-hooks': reactHooks,
     },
     rules: {
-      ...js.configs.recommended.rules,
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'react/react-in-jsx-scope': 'off',
