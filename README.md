@@ -281,7 +281,7 @@ graphiti/
 **Content Script** (`src/content/content.ts`)
 - Runs on every webpage
 - AnnotationManager - text highlighting
-- DrawingManager - canvas overlay (NEW!)
+- DrawingManager - canvas overlay
 - Pubky URL handler - intercepts pubky:// links
 
 **Popup** (`src/popup/`)
