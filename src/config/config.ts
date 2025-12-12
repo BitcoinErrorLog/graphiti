@@ -46,7 +46,8 @@ const DEFAULT_CONFIG: AppConfig = {
 function loadConfig(): AppConfig {
   // Vite exposes env variables via import.meta.env
   // In Vite projects, import.meta.env is always available at build time
-  // @ts-ignore - import.meta is a Vite feature
+  // @ts-ignore - import.meta is a Vite feature (not in standard TypeScript lib)
+  // This is safe as Vite transforms this at build time
   const viteEnv = (globalThis as any).import?.meta?.env || 
     (typeof window !== 'undefined' && (window as any).__VITE_ENV__) ||
     {};

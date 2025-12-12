@@ -11,6 +11,7 @@
  */
 
 import { storage } from '../utils/storage';
+import { logger } from '../utils/logger';
 
 // Import Pubky SDK types
 type Client = any;
@@ -52,18 +53,18 @@ class OffscreenHandler {
    */
   private async initialize(): Promise<void> {
     try {
-      console.log('[Graphiti Offscreen] Initializing Pubky client...');
+      logger.info('Offscreen', 'Initializing Pubky client');
       
       const { getPubkyClientAsync } = await import('../utils/pubky-client-factory');
       this.client = await getPubkyClientAsync();
       this.isInitialized = true;
       
-      console.log('[Graphiti Offscreen] Pubky client initialized successfully');
+      logger.info('Offscreen', 'Pubky client initialized successfully');
       
       // Set up message listener
       this.setupMessageListener();
     } catch (error) {
-      console.error('[Graphiti Offscreen] Failed to initialize Pubky client:', error);
+      logger.error('Offscreen', 'Failed to initialize Pubky client', error as Error);
     }
   }
 
@@ -90,20 +91,20 @@ class OffscreenHandler {
         return false;
       }
 
-      console.log('[Graphiti Offscreen] Received message:', message.type);
+      logger.info('Offscreen', 'Received message', { type: message.type });
 
       // Handle async operations
       this.handleMessage(message)
         .then(sendResponse)
         .catch((error) => {
-          console.error('[Graphiti Offscreen] Error handling message:', error);
+          logger.error('Offscreen', 'Error handling message', error as Error);
           sendResponse({ success: false, error: error.message });
         });
 
       return true; // Keep channel open for async response
     });
 
-    console.log('[Graphiti Offscreen] Message listener registered');
+    logger.info('Offscreen', 'Message listener registered');
   }
 
   /**
@@ -201,11 +202,11 @@ class OffscreenHandler {
         });
       }
 
-      console.log('[Graphiti Offscreen] Annotation synced:', fullPath);
+      logger.info('Offscreen', 'Annotation synced', { fullPath });
       
       return { success: true, data: { postUri: fullPath } };
     } catch (error) {
-      console.error('[Graphiti Offscreen] Failed to sync annotation:', error);
+      logger.error('Offscreen', 'Failed to sync annotation', error as Error);
       return { success: false, error: (error as Error).message };
     }
   }
@@ -259,11 +260,11 @@ class OffscreenHandler {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      console.log('[Graphiti Offscreen] Drawing synced:', fullPath);
+      logger.info('Offscreen', 'Drawing synced', { fullPath });
       
       return { success: true, data: { pubkyUrl: fullPath } };
     } catch (error) {
-      console.error('[Graphiti Offscreen] Failed to sync drawing:', error);
+      logger.error('Offscreen', 'Failed to sync drawing', error as Error);
       return { success: false, error: (error as Error).message };
     }
   }
@@ -335,14 +336,14 @@ class OffscreenHandler {
         }
       }
 
-      console.log('[Graphiti Offscreen] Sync complete:', { annotationsSynced, drawingsSynced });
+      logger.info('Offscreen', 'Sync complete', { annotationsSynced, drawingsSynced });
       
       return { 
         success: true, 
         data: { annotationsSynced, drawingsSynced }
       };
     } catch (error) {
-      console.error('[Graphiti Offscreen] Failed to sync all pending:', error);
+      logger.error('Offscreen', 'Failed to sync all pending', error as Error);
       return { success: false, error: (error as Error).message };
     }
   }
@@ -385,7 +386,7 @@ class OffscreenHandler {
         }
       };
     } catch (error) {
-      console.error('[Graphiti Offscreen] Failed to get sync status:', error);
+      logger.error('Offscreen', 'Failed to get sync status', error as Error);
       return { success: false, error: (error as Error).message };
     }
   }
@@ -394,5 +395,5 @@ class OffscreenHandler {
 // Initialize the offscreen handler
 new OffscreenHandler();
 
-console.log('[Graphiti Offscreen] Offscreen document loaded');
+logger.info('Offscreen', 'Offscreen document loaded');
 

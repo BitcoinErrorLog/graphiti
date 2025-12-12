@@ -7,9 +7,8 @@ import { getPubkyClientAsync } from './pubky-client-factory';
  * Pubky authentication using official @synonymdev/pubky SDK
  */
 
-// Import types from SDK
-type Client = any;
-type AuthRequest = any;
+// Import types from SDK type definitions
+import type { Client, AuthRequest } from '@synonymdev/pubky';
 
 const REQUIRED_CAPABILITIES = '/pub/pubky.app/:rw';
 const RELAY_URL = 'https://httprelay.pubky.app/link/';

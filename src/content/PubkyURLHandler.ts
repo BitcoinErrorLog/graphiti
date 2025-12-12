@@ -2,6 +2,8 @@ import { contentLogger as logger } from './logger';
 import DOMPurify from 'dompurify';
 
 export class PubkyURLHandler {
+  private domObserver: MutationObserver | null = null;
+
   constructor() {
     this.init();
   }
@@ -202,7 +204,12 @@ export class PubkyURLHandler {
   private observeDOMForPubkyURLs() {
     let isProcessing = false;
 
-    const observer = new MutationObserver((mutations) => {
+    // Disconnect existing observer if any
+    if (this.domObserver) {
+      this.domObserver.disconnect();
+    }
+
+    this.domObserver = new MutationObserver((mutations) => {
       const isOurMutation = mutations.some(mutation => {
         return Array.from(mutation.addedNodes).some(node => {
           if (node.nodeType === Node.ELEMENT_NODE) {
@@ -232,10 +239,22 @@ export class PubkyURLHandler {
       }
     });
 
-    observer.observe(document.body, {
+    this.domObserver.observe(document.body, {
       childList: true,
       subtree: true,
     });
+  }
+
+  /**
+   * Cleanup method to disconnect observer and remove event listeners
+   * Should be called when the handler is no longer needed
+   */
+  cleanup(): void {
+    if (this.domObserver) {
+      this.domObserver.disconnect();
+      this.domObserver = null;
+    }
+    document.removeEventListener('click', this.handleClick, true);
   }
 }
 
