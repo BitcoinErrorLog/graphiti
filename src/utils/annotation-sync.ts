@@ -6,15 +6,27 @@
 import { logger } from './logger';
 import { pubkyAPISDK } from './pubky-api-sdk';
 import { annotationStorage } from './annotations';
+import { storage } from './storage';
 
 export class AnnotationSync {
   /**
    * Sync any unsynced annotations to Pubky
    * Call this from popup/sidepanel when they open
+   * 
+   * This will sync:
+   * 1. Annotations created while logged in (have author but no postUri)
+   * 2. Annotations created while logged out (no author, but will be assigned current session)
    */
   static async syncPendingAnnotations(): Promise<void> {
     try {
       logger.info('AnnotationSync', 'Checking for unsynced annotations');
+      
+      // Get current session - required for syncing
+      const session = await storage.getSession();
+      if (!session) {
+        logger.info('AnnotationSync', 'No session found, skipping sync');
+        return;
+      }
       
       const allAnnotations = await annotationStorage.getAllAnnotations();
       let syncCount = 0;
@@ -22,7 +34,18 @@ export class AnnotationSync {
       // Find annotations without postUri (not synced to Pubky yet)
       for (const url in allAnnotations) {
         for (const annotation of allAnnotations[url]) {
-          if (!annotation.postUri && annotation.author) {
+          // Sync if: no postUri AND (has author OR we can assign current session as author)
+          if (!annotation.postUri) {
+            // If annotation was created while logged out, assign current session as author
+            if (!annotation.author || annotation.author === '') {
+              annotation.author = session.pubky;
+              await annotationStorage.saveAnnotation(annotation);
+              logger.info('AnnotationSync', 'Assigned author to annotation created while logged out', { 
+                id: annotation.id,
+                author: session.pubky 
+              });
+            }
+            
             try {
               logger.info('AnnotationSync', 'Syncing annotation to Pubky', { id: annotation.id });
               

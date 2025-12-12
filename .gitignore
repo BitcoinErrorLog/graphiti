@@ -36,3 +36,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 .cache/
+
+# Archive directories (development notes, duplicates, etc.)
+docs/archive/
