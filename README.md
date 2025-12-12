@@ -7,7 +7,7 @@ A powerful Chrome extension that lets you **draw graffiti on web pages**, create
 
 ## ✨ Features
 
-### 🎨 **Drawing Mode** (NEW!)
+### 🎨 **Drawing Mode**
 Draw graffiti directly on any webpage with a persistent canvas overlay:
 - **8-color palette** for vibrant drawings
 - **Adjustable brush thickness** (2-20px)
