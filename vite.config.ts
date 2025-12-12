@@ -74,6 +74,13 @@ export default defineConfig({
             if (id.includes('pubky-app-specs')) {
               return 'vendor-pubky-specs';
             }
+            // Lazy load heavy dependencies
+            if (id.includes('qrcode')) {
+              return 'vendor-qrcode';
+            }
+            if (id.includes('react-image-crop')) {
+              return 'vendor-image-crop';
+            }
             return 'vendor-other';
           }
         },
