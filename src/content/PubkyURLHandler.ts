@@ -1,4 +1,5 @@
 import { contentLogger as logger } from './logger';
+import DOMPurify from 'dompurify';
 
 export class PubkyURLHandler {
   constructor() {
@@ -165,10 +166,12 @@ export class PubkyURLHandler {
 
         const normalizedUrl = url.replace(/^pubky:(?!\/\/)/, 'pubky://');
         button.setAttribute('data-pubky-url', normalizedUrl);
-        button.innerHTML = `
+        // Sanitize button HTML with DOMPurify (synchronous import)
+        const buttonHtml = `
         <span class="pubky-link-icon">🔗</span>
         <span>${url.length > 30 ? url.substring(0, 30) + '...' : url}</span>
       `;
+        button.innerHTML = DOMPurify.sanitize(buttonHtml);
         fragments.push(button);
 
         lastIndex = matchIndex + url.length;

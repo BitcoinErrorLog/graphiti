@@ -4,6 +4,7 @@
  */
 
 import { imageHandler } from '../utils/image-handler';
+import DOMPurify from 'dompurify';
 
 // Inline logger for profile renderer
 class ProfileRendererLogger {
@@ -76,9 +77,9 @@ class ProfileRenderer {
 
   private async initializePubky() {
     try {
-      const { Client } = await import('@synonymdev/pubky');
-      this.pubky = new Client();
-      rendererLogger.info('Pubky Client initialized');
+      const { getPubkyClientAsync } = await import('../utils/pubky-client-factory');
+      this.pubky = await getPubkyClientAsync();
+      rendererLogger.info('Pubky Client initialized via singleton');
     } catch (error) {
       rendererLogger.error('Failed to initialize Pubky Client', error);
       throw new Error('Failed to initialize Pubky client');
@@ -255,7 +256,7 @@ class ProfileRenderer {
     }
   }
 
-  private showContent(html: string, title: string) {
+  private async showContent(html: string, title: string) {
     // Update document title
     document.title = title;
 
@@ -263,8 +264,8 @@ class ProfileRenderer {
     this.loadingEl.classList.add('hidden');
     this.errorEl.classList.add('hidden');
 
-    // Show content
-    this.contentEl.innerHTML = html;
+    // Sanitize HTML from homeserver before displaying (critical security fix)
+    this.contentEl.innerHTML = DOMPurify.sanitize(html);
     this.contentEl.classList.remove('hidden');
   }
 

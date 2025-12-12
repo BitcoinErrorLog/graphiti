@@ -28,12 +28,12 @@ export class ProfileManager {
   }
 
   /**
-   * Initialize the Pubky client
+   * Initialize the Pubky client using singleton factory
    */
   private async ensureClient(): Promise<any> {
     if (!this.client) {
-      const { Client } = await import('@synonymdev/pubky');
-      this.client = new Client();
+      const { getPubkyClientAsync } = await import('./pubky-client-factory');
+      this.client = await getPubkyClientAsync();
     }
     return this.client;
   }

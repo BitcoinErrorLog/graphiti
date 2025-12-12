@@ -49,24 +49,15 @@ class PubkyAPISDK {
     }
 
     try {
-      // Dynamic import with error handling - the package itself might access window
-      const pubkyModule = await import('@synonymdev/pubky').catch((importError) => {
-        // If import fails due to window issues, wrap the error
-        if (importError.message?.includes('window') || !this.isClientContextAvailable()) {
-          throw new Error('Pubky Client requires window object (not available in service workers)');
-        }
-        throw importError;
-      });
-      
-      const { Client } = pubkyModule;
-      
-      // Check window again before creating Client (it might access window in constructor)
+      // Check window before getting Client (it might access window in constructor)
       if (!this.isClientContextAvailable()) {
         throw new Error('Pubky Client requires window object (not available in service workers)');
       }
       
-      this.pubky = new Client();
-      logger.info('PubkyAPISDK', 'Pubky Client initialized');
+      // Use singleton factory instead of creating new instance
+      const { getPubkyClientAsync } = await import('./pubky-client-factory');
+      this.pubky = await getPubkyClientAsync();
+      logger.info('PubkyAPISDK', 'Pubky Client initialized via singleton');
     } catch (error) {
       // Use console directly to avoid circular logger issues
       console.error('[PubkyAPISDK] Failed to initialize Pubky Client', error);

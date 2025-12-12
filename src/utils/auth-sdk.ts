@@ -1,6 +1,7 @@
 import { logger } from './logger';
 import { storage, Session } from './storage';
 import { profileManager } from './profile-manager';
+import { getPubkyClientAsync } from './pubky-client-factory';
 
 /**
  * Pubky authentication using official @synonymdev/pubky SDK
@@ -25,7 +26,21 @@ class AuthManagerSDK {
   private currentAuthRequest: AuthRequest | null = null;
 
   private constructor() {
-    this.initializePubky();
+    // Client will be initialized lazily via ensureClient()
+  }
+  
+  /**
+   * Validate capabilities format before use
+   */
+  private validateCapabilities(capabilities: string): string {
+    if (!capabilities || typeof capabilities !== 'string') {
+      throw new Error('Capabilities must be a non-empty string');
+    }
+    // Validate format - must start with /pub/
+    if (!capabilities.startsWith('/pub/')) {
+      throw new Error('Capabilities must start with /pub/');
+    }
+    return capabilities;
   }
 
   static getInstance(): AuthManagerSDK {
@@ -36,28 +51,14 @@ class AuthManagerSDK {
   }
 
   /**
-   * Initialize Pubky client
-   */
-  private async initializePubky() {
-    try {
-      // Dynamic import to handle the SDK
-      const { Client } = await import('@synonymdev/pubky');
-      this.client = new Client();
-      logger.info('AuthSDK', 'Pubky Client initialized');
-    } catch (error) {
-      logger.error('AuthSDK', 'Failed to initialize Pubky Client', error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Ensure Client is initialized
+   * Ensure Client is initialized using singleton factory
    */
   private async ensureClient(): Promise<Client> {
     if (!this.client) {
-      await this.initializePubky();
+      this.client = await getPubkyClientAsync();
+      logger.info('AuthSDK', 'Pubky Client initialized via singleton');
     }
-    return this.client!;
+    return this.client;
   }
 
   /**
@@ -69,8 +70,11 @@ class AuthManagerSDK {
 
       const client = await this.ensureClient();
       
-      // Create auth request with capabilities
-      this.currentAuthRequest = client.authRequest(RELAY_URL, REQUIRED_CAPABILITIES);
+      // Validate capabilities before creating auth request
+      const validatedCapabilities = this.validateCapabilities(REQUIRED_CAPABILITIES);
+      
+      // Create auth request with validated capabilities
+      this.currentAuthRequest = client.authRequest(RELAY_URL, validatedCapabilities);
       
       // Get authorization URL (pubkyauth:// URL)
       const authUrl = this.currentAuthRequest.url();
