@@ -2,6 +2,7 @@ import { contentLogger as logger } from './logger';
 import { compressCanvas, getRecommendedQuality, formatBytes } from '../utils/image-compression';
 import { DRAWING_CONSTANTS, DRAWING_UI_CONSTANTS, MESSAGE_TYPES, UI_CONSTANTS } from '../utils/constants';
 import { isHTMLInputElement } from '../utils/type-guards';
+import DOMPurify from 'dompurify';
 
 export class DrawingManager {
   private canvas: HTMLCanvasElement | null = null;
@@ -202,7 +203,7 @@ export class DrawingManager {
       backdrop-filter: blur(10px);
     `;
 
-    this.toolbar.innerHTML = `
+    const toolbarHtml = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <div>
           <div style="font-weight: 600; margin-bottom: 2px;">Graphiti Drawing</div>
@@ -284,6 +285,7 @@ export class DrawingManager {
         ">Save</button>
       </div>
     `;
+    this.toolbar.innerHTML = DOMPurify.sanitize(toolbarHtml);
 
     document.body.appendChild(this.toolbar);
 

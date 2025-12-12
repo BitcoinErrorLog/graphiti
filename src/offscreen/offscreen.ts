@@ -54,8 +54,8 @@ class OffscreenHandler {
     try {
       console.log('[Graphiti Offscreen] Initializing Pubky client...');
       
-      const { Client } = await import('@synonymdev/pubky');
-      this.client = new Client();
+      const { getPubkyClientAsync } = await import('../utils/pubky-client-factory');
+      this.client = await getPubkyClientAsync();
       this.isInitialized = true;
       
       console.log('[Graphiti Offscreen] Pubky client initialized successfully');
@@ -287,7 +287,14 @@ class OffscreenHandler {
       const allAnnotations = await annotationStorage.getAllAnnotations();
       for (const url in allAnnotations) {
         for (const annotation of allAnnotations[url]) {
-          if (!annotation.postUri && annotation.author) {
+          // Sync if: no postUri AND (has author OR we can assign current session as author)
+          if (!annotation.postUri) {
+            // If annotation was created while logged out, assign current session as author
+            if (!annotation.author || annotation.author === '') {
+              annotation.author = session.pubky;
+              await annotationStorage.saveAnnotation(annotation);
+            }
+            
             const result = await this.syncAnnotation({
               url: annotation.url,
               selectedText: annotation.selectedText,

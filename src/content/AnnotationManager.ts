@@ -10,6 +10,7 @@ import {
 } from '../utils/validation';
 import { ANNOTATION_CONSTANTS, MESSAGE_TYPES, TIMING_CONSTANTS, UI_CONSTANTS } from '../utils/constants';
 import { isHTMLButtonElement } from '../utils/type-guards';
+import DOMPurify from 'dompurify';
 
 /**
  * Annotation data structure
@@ -460,12 +461,14 @@ export class AnnotationManager {
 
     const button = document.createElement('button');
     button.className = 'pubky-annotation-button';
-    button.innerHTML = `
+    // Use DOMPurify to sanitize HTML (defense-in-depth, even though this is static)
+    const buttonHtml = `
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
       </svg>
       Add Annotation
     `;
+    button.innerHTML = DOMPurify.sanitize(buttonHtml);
     
     // Position button to the right and slightly below the selection
     // Account for button width (approximately 140px) and add some padding
@@ -572,7 +575,8 @@ export class AnnotationManager {
     modal.className = 'pubky-annotation-modal';
     modal.onclick = (e) => e.stopPropagation();
 
-    modal.innerHTML = `
+    // Sanitize modal HTML with DOMPurify
+    const modalHtml = `
       <h3>Add Annotation</h3>
       <div class="selected-text">"${this.escapeHtml(this.currentSelection.text)}"</div>
       <textarea placeholder="Add your comment..." autofocus maxlength="${VALIDATION_LIMITS.COMMENT_MAX_LENGTH}"></textarea>
@@ -585,6 +589,7 @@ export class AnnotationManager {
         <button class="submit-btn">Post Annotation</button>
       </div>
     `;
+    modal.innerHTML = DOMPurify.sanitize(modalHtml);
 
     const textarea = modal.querySelector('textarea')!;
     const cancelBtn = modal.querySelector('.cancel-btn')!;
@@ -920,6 +925,7 @@ export class AnnotationManager {
   private handleHighlightClick(annotation: Annotation) {
     logger.info('ContentScript', 'Highlight clicked', { id: annotation.id });
 
+    // Highlight the clicked annotation on the page
     document.querySelectorAll(`.${this.activeHighlightClass}`).forEach((el) => {
       el.classList.remove(this.activeHighlightClass);
     });
@@ -927,11 +933,21 @@ export class AnnotationManager {
     const highlight = document.querySelector(`[data-annotation-id="${annotation.id}"]`);
     if (highlight) {
       highlight.classList.add(this.activeHighlightClass);
+      // Scroll the highlight into view
+      highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
+    // Send message to background to open sidepanel
+    // Must be synchronous to preserve user gesture context
     chrome.runtime.sendMessage({
-      type: 'SHOW_ANNOTATION',
+      type: 'OPEN_SIDE_PANEL_FOR_ANNOTATION',
       annotationId: annotation.id,
+    }, () => {
+      if (chrome.runtime.lastError) {
+        logger.warn('ContentScript', 'Failed to send open sidepanel message', new Error(chrome.runtime.lastError.message));
+      } else {
+        logger.info('ContentScript', 'Sidepanel open requested', { annotationId: annotation.id });
+      }
     });
   }
 
