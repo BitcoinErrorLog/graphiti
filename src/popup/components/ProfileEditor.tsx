@@ -3,6 +3,7 @@ import { storage, ProfileData } from '../../utils/storage';
 import { profileManager } from '../../utils/profile-manager';
 import { logger } from '../../utils/logger';
 import { validateProfile, VALIDATION_LIMITS } from '../../utils/validation';
+import { exportRecoveryFile, validatePassphrase } from '../../utils/recovery-file';
 import ProgressBar from './ProgressBar';
 import ImageCropper from './ImageCropper';
 
@@ -538,7 +539,120 @@ export function ProfileEditor() {
         <p className="text-xs text-gray-400">
           * Your profile will be saved as profile.json and a generated index.html on your homeserver
         </p>
+
+        {/* Recovery File Export */}
+        <div className="border-t border-gray-700 pt-4 mt-4">
+          <h3 className="text-sm font-medium text-gray-300 mb-2">Key Backup</h3>
+          <p className="text-xs text-gray-400 mb-3">
+            Export a recovery file to backup your keys. Store it securely - you'll need it if you lose access to your device.
+          </p>
+          <button
+            onClick={() => setShowRecoveryModal(true)}
+            className="w-full px-4 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 border border-yellow-600/50 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-yellow-500"
+            aria-label="Export recovery file"
+          >
+            🔐 Export Recovery File
+          </button>
+        </div>
       </div>
+      
+      {/* Recovery File Modal */}
+      {showRecoveryModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1F1F1F] border border-[#3F3F3F] rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold text-white mb-4">Export Recovery File</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Enter a strong passphrase to encrypt your recovery file. You'll need this passphrase to restore your keys.
+            </p>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Passphrase
+                </label>
+                <input
+                  type="password"
+                  value={recoveryPassphrase}
+                  onChange={(e) => {
+                    setRecoveryPassphrase(e.target.value);
+                    setRecoveryError(null);
+                  }}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  placeholder="Enter passphrase (min 8 characters)"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Confirm Passphrase
+                </label>
+                <input
+                  type="password"
+                  value={recoveryPassphraseConfirm}
+                  onChange={(e) => {
+                    setRecoveryPassphraseConfirm(e.target.value);
+                    setRecoveryError(null);
+                  }}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  placeholder="Confirm passphrase"
+                />
+              </div>
+              
+              {recoveryError && (
+                <div className="text-sm text-red-400">{recoveryError}</div>
+              )}
+              
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={async () => {
+                    setRecoveryError(null);
+                    
+                    // Validate passphrase
+                    const validation = validatePassphrase(recoveryPassphrase);
+                    if (!validation.isValid) {
+                      setRecoveryError(validation.error || 'Invalid passphrase');
+                      return;
+                    }
+                    
+                    if (recoveryPassphrase !== recoveryPassphraseConfirm) {
+                      setRecoveryError('Passphrases do not match');
+                      return;
+                    }
+                    
+                    try {
+                      setIsExportingRecovery(true);
+                      await exportRecoveryFile(recoveryPassphrase);
+                      showMessage('success', 'Recovery file exported successfully');
+                      setShowRecoveryModal(false);
+                      setRecoveryPassphrase('');
+                      setRecoveryPassphraseConfirm('');
+                    } catch (error) {
+                      setRecoveryError((error as Error).message || 'Failed to export recovery file');
+                    } finally {
+                      setIsExportingRecovery(false);
+                    }
+                  }}
+                  disabled={isExportingRecovery || !recoveryPassphrase || !recoveryPassphraseConfirm}
+                  className="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 text-white rounded-lg transition focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                >
+                  {isExportingRecovery ? 'Exporting...' : 'Export'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowRecoveryModal(false);
+                    setRecoveryPassphrase('');
+                    setRecoveryPassphraseConfirm('');
+                    setRecoveryError(null);
+                  }}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition focus:outline-none focus:ring-2 focus:ring-gray-500"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Image Cropper Modal */}
       {showCropper && imageFileToCrop && (

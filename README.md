@@ -106,8 +106,15 @@ npm run build
 | `Alt+D` | Toggle Drawing | Enable/disable drawing mode |
 | `Alt+S` | Toggle Sidebar | Open/close the side panel |
 | `Alt+A` | Open Annotations | Jump to annotations tab |
+| `Alt+Shift+A` | Toggle Annotations | Enable/disable annotation button |
+| `Shift+?` | Show Shortcuts | Display keyboard shortcuts help |
+| `Ctrl+Z` / `Cmd+Z` | Undo | Undo last action (in drawing mode) |
+| `Ctrl+Y` / `Cmd+Shift+Z` | Redo | Redo last action (in drawing mode) |
+| `Escape` | Close/Exit | Close modal or exit drawing mode |
 
-*On Mac, use `Option` instead of `Alt`*
+*On Mac, use `Option` instead of `Alt` and `Cmd` instead of `Ctrl`*
+
+**Tip:** Press `Shift+?` in the popup or sidepanel to see all available shortcuts!
 
 ## 📖 Usage Guide
 
