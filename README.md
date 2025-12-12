@@ -2,7 +2,7 @@
 
 A powerful Chrome extension that lets you **draw graffiti on web pages**, create text annotations, bookmark URLs, and share everything through the decentralized Pubky network. All your data syncs to your personal Pubky homeserver - no third-party tracking!
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/yourusername/graphiti)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/BitcoinErrorLog/graphiti)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ## ✨ Features
@@ -48,12 +48,13 @@ See what your network is sharing:
 - Post your own content with tags
 - Engage with your decentralized network
 
-### 🔐 **Privacy-First Authentication**
-Secure QR-based authentication:
+### 🔐 **Privacy-First Authentication & Key Management**
+Secure QR-based authentication with key backup:
 - Scan QR code with Pubky Ring mobile app
 - No passwords, no tracking
 - Your keys, your data
 - Sessions stored locally
+- **Recovery file export** - Backup your keys with encrypted recovery files
 - Full control over your identity
 
 ### 🛠️ **Developer Tools**
@@ -68,18 +69,21 @@ Built-in debugging and monitoring:
 
 ### Installation (For Users)
 
-**Option 1: Install from ZIP**
-1. Download `graphiti-extension.zip`
-2. Extract to a folder
+**Option 1: Install from ZIP (Recommended)**
+1. Download `graphiti-extension.zip` from the repository
+2. Extract the zip file to a folder (e.g., `graphiti-extension`)
 3. Open Chrome → `chrome://extensions`
-4. Enable "Developer mode"
-5. Click "Load unpacked" → Select the `dist` folder
-6. Done! 🎉
+4. Enable "Developer mode" (toggle in top-right)
+5. Click "Load unpacked"
+6. Select the extracted folder (not the zip file itself)
+7. Done! 🎉
+
+**Note:** The zip file contains the pre-built extension. You don't need to build it yourself.
 
 **Option 2: Build from Source**
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/graphiti.git
+git clone https://github.com/BitcoinErrorLog/graphiti.git
 cd graphiti
 
 # Install dependencies
@@ -196,6 +200,25 @@ npm run build
 - **Posts** - All posts about current URL from your network
 - **Annotations** - Text annotations on this page
 - **Your Content** - Your own posts and annotations
+
+### Profile Management
+
+**Edit Your Profile:**
+1. Click the extension icon
+2. Click "✏️ Edit Profile"
+3. Update your name, bio, avatar, status, and links
+4. Click "Save Profile" to sync to your homeserver
+
+**Export Recovery File (Key Backup):**
+1. Click the extension icon
+2. Click "✏️ Edit Profile"
+3. Scroll to "Key Backup" section
+4. Click "🔐 Export Recovery File"
+5. Enter a strong passphrase (min 8 chars, letters + numbers)
+6. Confirm the passphrase
+7. File downloads automatically (`pubky-recovery-YYYY-MM-DD.recovery`)
+
+**Important:** Store your recovery file securely! You'll need it and your passphrase to restore your keys if you lose access to your device.
 
 ## 🏗️ Architecture
 
@@ -584,11 +607,15 @@ MIT License - see [LICENSE](LICENSE) file for details
 - **Pubky Team** - For the innovative protocol and SDK
 - **Open Source Community** - For amazing tools and libraries
 
-## 📞 Support
+## 📞 Support & Documentation
 
-- **Issues:** [GitHub Issues](https://github.com/yourusername/graphiti/issues)
-- **Docs:** See `/docs` folder for detailed documentation
-- **Debug:** Use built-in debug panel in extension
+- **Issues:** [GitHub Issues](https://github.com/BitcoinErrorLog/graphiti/issues)
+- **Documentation:** See `/docs` folder for detailed technical documentation
+- **Features:** See [FEATURES.md](FEATURES.md) for complete feature documentation
+- **Security:** See [SECURITY.md](SECURITY.md) for security information
+- **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
+- **Changelog:** See [CHANGELOG.md](CHANGELOG.md) for version history
+- **Debug:** Use built-in debug panel in extension (click 🔧 in popup)
 
 ## 🌟 Star History
 

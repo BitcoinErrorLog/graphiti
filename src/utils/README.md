@@ -207,8 +207,72 @@ Unit tests are in `__tests__/` directory:
 npm test
 ```
 
+## Recovery File Utility
+
+**New in Phase 4:** Recovery file export for key backup.
+
+| Module | Purpose |
+|--------|---------|
+| `recovery-file.ts` | Export encrypted recovery files for key backup |
+
+**Usage:**
+```typescript
+import { exportRecoveryFile, validatePassphrase } from './recovery-file';
+
+// Validate passphrase
+const validation = validatePassphrase('myPass123');
+if (!validation.isValid) {
+  console.error(validation.error);
+  return;
+}
+
+// Export recovery file
+await exportRecoveryFile('myPass123');
+// File downloads automatically: pubky-recovery-YYYY-MM-DD.recovery
+```
+
+**Passphrase Requirements:**
+- Minimum 8 characters
+- Maximum 128 characters
+- Must contain both letters and numbers
+- Used to encrypt the recovery file
+
+**Recovery File:**
+- Encrypted with user passphrase
+- Contains keys needed to restore access
+- Should be stored securely offline
+- Required to restore keys if device is lost
+
+## Pubky Client Factory
+
+**New in Phase 2:** Singleton pattern for Pubky Client.
+
+| Module | Purpose |
+|--------|---------|
+| `pubky-client-factory.ts` | Singleton factory for Pubky Client instance |
+
+**Usage:**
+```typescript
+import { getPubkyClientAsync } from './pubky-client-factory';
+
+// Get singleton instance (async)
+const client = await getPubkyClientAsync();
+
+// Use client
+const response = await client.fetch('pubky://...');
+```
+
+**Features:**
+- Single shared instance across extension
+- Prevents memory leaks
+- Ensures consistent state
+- Supports testnet mode via `VITE_PUBKY_NETWORK` env var
+- Configures SDK logging level automatically
+
 ## See Also
 
 - [Testing Documentation](../../docs/TESTING.md)
 - [UTF-16 Encoding Spec](../../docs/UTF16_HASH_ENCODING.md)
+- [Pubky Client Factory](./pubky-client-factory.ts) - Singleton implementation
+- [Recovery File Utility](./recovery-file.ts) - Key backup functionality
 
