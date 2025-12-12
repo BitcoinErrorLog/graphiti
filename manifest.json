@@ -77,11 +77,14 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    // Note: 'wasm-unsafe-eval' is required for Pubky SDK WebAssembly support
   },
   "web_accessible_resources": [
     {
       "resources": ["src/profile/profile-renderer.html"],
       "matches": ["<all_urls>"]
+      // Note: Profile renderer needs to be accessible from any page to display
+      // pubky:// URLs. This is a core feature requirement.
     }
   ]
 }

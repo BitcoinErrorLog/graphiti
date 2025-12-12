@@ -1,5 +1,7 @@
 import { contentLogger as logger } from './logger';
-// @ts-ignore - No type definitions available
+// @ts-ignore - dom-anchor-text-quote lacks TypeScript definitions
+// Tracking: https://github.com/nicksellen/dom-anchor-text-quote
+// TODO: Create PR with type definitions or find alternative library
 import * as textQuote from 'dom-anchor-text-quote';
 import { 
   validateSelectedText, 

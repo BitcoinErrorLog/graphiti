@@ -25,9 +25,11 @@ function App() {
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const [postsPage, setPostsPage] = useState(0);
   // @ts-ignore - postsCursor is set for future cursor-based pagination
+  // This will be used when implementing cursor-based pagination for large feeds
   const [postsCursor, setPostsCursor] = useState<string | undefined>(undefined);
   const POSTS_PER_PAGE = 20;
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const [highlightedAnnotationId, setHighlightedAnnotationId] = useState<string | null>(null);
 
   useEffect(() => {
     initializePanel();
@@ -87,8 +89,9 @@ function App() {
     // Listen for messages to scroll to annotations or switch tabs
     const handleMessage = (message: any) => {
       if (message.type === 'SCROLL_TO_ANNOTATION') {
+        logger.info('SidePanel', 'Scroll to annotation requested', { annotationId: message.annotationId });
         setActiveTab('annotations');
-        // Scroll logic will be handled in the render
+        setHighlightedAnnotationId(message.annotationId);
       }
       
       if (message.type === 'SWITCH_TO_ANNOTATIONS') {
@@ -102,6 +105,26 @@ function App() {
       chrome.runtime.onMessage.removeListener(handleMessage);
     };
   }, []);
+
+  // Scroll to annotation when it's loaded and highlighted
+  useEffect(() => {
+    if (highlightedAnnotationId && annotations.length > 0) {
+      // Wait for DOM to update, then scroll
+      setTimeout(() => {
+        const annotationElement = document.querySelector(`[data-annotation-id="${highlightedAnnotationId}"]`);
+        if (annotationElement) {
+          annotationElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Add a highlight class for visual feedback
+          annotationElement.classList.add('ring-2', 'ring-[#667eea]', 'ring-offset-2', 'ring-offset-[#1F1F1F]');
+          // Remove highlight after a few seconds
+          setTimeout(() => {
+            annotationElement.classList.remove('ring-2', 'ring-[#667eea]', 'ring-offset-2', 'ring-offset-[#1F1F1F]');
+            setHighlightedAnnotationId(null);
+          }, 3000);
+        }
+      }, 100);
+    }
+  }, [highlightedAnnotationId, annotations]);
 
   // Keyboard shortcut listener for Shift+?
   useEffect(() => {
