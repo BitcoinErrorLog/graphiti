@@ -91,8 +91,47 @@ Fixed popup size: `400px × 500px`
 }
 ```
 
+## Features
+
+### Authentication
+- QR code generation and display
+- Relay polling for auth tokens
+- Session management
+- Error handling
+
+### Quick Actions
+- Bookmark current page
+- Toggle drawing mode
+- Create posts with tags
+- Open side panel feed
+
+### Profile Management
+- Edit profile (name, bio, avatar, status, links)
+- Export recovery file for key backup
+- Image upload and cropping
+- Homeserver sync
+
+### Debug Tools
+- Real-time log viewer
+- Log filtering and export
+- Performance monitoring
+
+## Keyboard Shortcuts
+
+- `Shift+?` - Show keyboard shortcuts help
+- `Escape` - Close modals
+
+## State Management
+
+Uses React Context API:
+- `SessionContext` - Authentication state
+- `ThemeContext` - Theme preferences
+
 ## See Also
 
-- [Sidepanel](../sidepanel/README.md)
-- [Auth SDK](../utils/auth-sdk.ts)
+- [Sidepanel](../sidepanel/README.md) - Feed viewer
+- [Auth SDK](../utils/auth-sdk.ts) - Authentication logic
+- [Recovery File](../utils/recovery-file.ts) - Key backup
+- [Components](./components/README.md) - Component documentation
+- [Main README](../../README.md) - Getting started guide
 

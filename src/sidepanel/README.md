@@ -115,8 +115,47 @@ useEffect(() => {
 
 Matches popup theme with dark background and tailored for panel width.
 
+## Features
+
+### Feed Display
+- Posts about current URL from your network
+- Annotations on current page
+- Your own content
+- Real-time updates
+
+### Navigation
+- Tab-based interface
+- Click annotations to highlight on page
+- Scroll to annotation location
+- Refresh feed
+
+### Post Interaction
+- View author profiles
+- See tags and content
+- Navigate to original URLs
+- View embedded content
+
+## Keyboard Shortcuts
+
+- `Shift+?` - Show keyboard shortcuts help
+- `Escape` - Close side panel
+
+## State Management
+
+Uses React Context API:
+- `SessionContext` - Authentication state
+- `ThemeContext` - Theme preferences
+
+## Performance
+
+- Lazy loading for large feeds
+- Efficient re-renders
+- Memoization for expensive operations
+
 ## See Also
 
-- [Popup](../popup/README.md)
+- [Popup](../popup/README.md) - Main UI
 - [Annotation Feature](../../FEATURES.md#text-annotations)
+- [Components](./components/README.md) - Component documentation
+- [Main README](../../README.md) - Getting started guide
 

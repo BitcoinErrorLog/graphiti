@@ -103,9 +103,54 @@ The Pubky SDK requires `window` for initialization, so we use the **Chrome Offsc
 The popup displays sync status and allows manual sync:
 - `src/popup/components/SyncStatus.tsx` - Sync status component
 
+## Logging
+
+All background operations use the centralized logger:
+
+```typescript
+import { logger } from '../utils/logger';
+
+logger.info('Background', 'Operation started');
+logger.error('Background', 'Operation failed', error);
+```
+
+**Log Contexts:**
+- `Background` - Service worker operations
+- `Command` - Keyboard command handling
+- `Message` - Message routing
+- `Storage` - Storage operations
+
+## Error Handling
+
+Errors are handled using the centralized error handler:
+
+```typescript
+import ErrorHandler from '../utils/error-handler';
+
+try {
+  // Operation
+} catch (error) {
+  ErrorHandler.handle(error, {
+    context: 'Background',
+    data: { operation: 'sync' },
+    showNotification: true,
+  });
+}
+```
+
+## Performance
+
+- Message handlers are optimized for speed
+- Async operations don't block message channel
+- Storage operations are batched when possible
+- Rate limiting prevents API abuse
+
 ## See Also
 
 - [Manifest](../../manifest.json) - Command definitions
 - [Content Script](../content/README.md) - Page-injected code
 - [Offscreen API Docs](https://developer.chrome.com/docs/extensions/reference/api/offscreen)
+- [Offscreen Document](../offscreen/README.md) - Offscreen document details
+- [Error Handler](../utils/error-handler.ts) - Error handling utility
+- [Logger](../utils/logger.ts) - Logging utility
 

@@ -117,8 +117,51 @@ const walker = document.createTreeWalker(
 );
 ```
 
+## Security
+
+**XSS Prevention:**
+All HTML content is sanitized with DOMPurify before being inserted into the DOM:
+
+```typescript
+import DOMPurify from 'dompurify';
+
+// Sanitize before innerHTML
+button.innerHTML = DOMPurify.sanitize(htmlContent);
+```
+
+This applies even to static templates as a defense-in-depth measure.
+
+## Memory Management
+
+**MutationObserver Cleanup:**
+The PubkyURLHandler properly manages its MutationObserver:
+
+```typescript
+class PubkyURLHandler {
+  private domObserver: MutationObserver | null = null;
+  
+  cleanup(): void {
+    if (this.domObserver) {
+      this.domObserver.disconnect();
+      this.domObserver = null;
+    }
+  }
+}
+```
+
+This prevents memory leaks on long-running pages.
+
+## Performance
+
+- TreeWalker for efficient DOM traversal
+- Debounced DOM observation (500ms)
+- Lazy initialization of managers
+- Efficient text node filtering
+
 ## See Also
 
 - [Drawing Feature](../../FEATURES.md#drawing-mode)
 - [Annotation Feature](../../FEATURES.md#text-annotations)
+- [DOMPurify](https://github.com/cure53/DOMPurify) - HTML sanitization library
+- [Main README](../../README.md) - Getting started guide
 
